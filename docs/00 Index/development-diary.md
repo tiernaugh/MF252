@@ -191,3 +191,61 @@ The mock data structure successfully represents:
 - All changes committed and pushed to GitHub
 - Vercel auto-deploying from main branch
 - UI fully functional with mock data
+
+---
+
+## Day 4 - Project Detail Page Redesign
+
+### Editorial Design Pattern
+- **Problem**: Initial project detail page felt like admin UI, not editorial product
+- **Solution**: Merged best of prototype design with functional requirements
+- **Inspiration**: Monocle/Wired editorial layouts
+
+### Key Design Changes
+- **Hero Episode Pattern**: 
+  - Large serif typography (4-5xl titles)
+  - Prominent pull quotes with border accent
+  - Clear metadata hierarchy (Episode # • Reading time • NEW badge)
+  - Editorial-style CTA button with hover effects
+
+- **Activity Indicators**:
+  - NEW badge for episodes < 7 days old
+  - Calculated from publishedAt date
+  - Future: UNREAD tracking via localStorage
+
+- **Next Episode Preview**:
+  - "COMING THURSDAY" dynamic day display
+  - Research questions being explored
+  - Influence window countdown timer
+  - Subtle, doesn't compete with hero
+
+- **Visual Refinements**:
+  - Stone-50 background for premium feel
+  - Gradient dividers between sections
+  - Card hover with shadow + lift animation
+  - Search with icon-based input
+
+### Documentation Created
+- **Project Detail PRD**: Comprehensive requirements and user stories
+- **ADR-019**: Architecture decision for hybrid SSR/client approach
+- **Data Model Updates**: UpcomingEpisode type with preview questions
+
+### Technical Implementation
+- Mock data enhanced with upcoming episodes
+- Activity tracking fields added (isNew, isRead)
+- Search with real-time filtering
+- Responsive design with mobile considerations
+
+### What's Working Well
+- Editorial layout creates clear reading priority
+- Hero pattern makes latest episode unmissable
+- Preview questions create anticipation
+- Search is discoverable but not intrusive
+- Activity indicators add urgency without clutter
+
+### Next Immediate Steps
+1. Set up Supabase with validated schema
+2. Add Clerk authentication with organizations
+3. Connect real data sources
+4. Implement localStorage for activity tracking
+5. Add settings menu functionality

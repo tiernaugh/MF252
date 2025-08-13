@@ -81,6 +81,24 @@ export type Episode = {
   readingMinutes: number; // Pre-calculated read time
   createdAt: Date;
   updatedAt: Date;
+  
+  // Activity tracking - calculated at runtime based on user's localStorage
+  // These fields don't need database storage, they're derived from:
+  // - isNew: publishedAt > lastVisit (from localStorage)
+  // - isRead: episodeId in readEpisodes Set (from localStorage)
+  // Including here for TypeScript convenience in components
+  isNew?: boolean; // Published within last 7 days
+  isRead?: boolean; // User has opened this episode
+};
+
+// Upcoming episode preview data
+// Used to show what's coming next and allow influence window
+export type UpcomingEpisode = {
+  projectId: string;
+  scheduledAt: Date; // When the episode will be ready
+  status: 'scheduled' | 'generating' | 'ready';
+  previewQuestions?: string[]; // 2-3 research questions being explored
+  influenceDeadline?: Date; // When feedback window closes (usually scheduledAt - 6 hours)
 };
 
 export type TokenUsage = {
@@ -444,6 +462,31 @@ export const mockTokenUsage: TokenUsage[] = [
   }
 ];
 
+// Mock upcoming episodes - preview of what's coming next
+export const mockUpcomingEpisodes: UpcomingEpisode[] = [
+  {
+    projectId: "proj_1",
+    scheduledAt: new Date("2025-08-20"),
+    status: 'scheduled',
+    previewQuestions: [
+      "Are we leaning too much toward vendor narratives?",
+      "Should we widen the lens to workforce implications?"
+    ],
+    influenceDeadline: new Date("2025-08-19T18:00:00"), // 6 hours before scheduled
+  },
+  {
+    projectId: "proj_2",
+    scheduledAt: new Date("2025-08-15"),
+    status: 'generating',
+    previewQuestions: [
+      "How are companies measuring remote work productivity differently?",
+      "What new workplace technologies are gaining unexpected traction?",
+      "Is the 4-day work week becoming mainstream in tech?"
+    ],
+    influenceDeadline: new Date("2025-08-14T18:00:00"),
+  }
+];
+
 // ============================================
 // HELPER FUNCTIONS
 // These simulate database queries
@@ -468,4 +511,8 @@ export function getTotalCostByOrg(orgId: string): number {
   return mockTokenUsage
     .filter(t => t.organizationId === orgId)
     .reduce((sum, t) => sum + t.totalCost, 0);
+}
+
+export function getUpcomingEpisode(projectId: string): UpcomingEpisode | null {
+  return mockUpcomingEpisodes.find(e => e.projectId === projectId) || null;
 }

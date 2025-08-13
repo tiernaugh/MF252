@@ -1,36 +1,35 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
+import { Card, CardContent } from "~/components/ui/card";
 import { Button } from "~/components/ui/button";
 import { Badge } from "~/components/ui/badge";
-import { Separator } from "~/components/ui/separator";
+import { Input } from "~/components/ui/input";
 import { 
   ArrowLeft, 
-  Play, 
-  Pause, 
-  Calendar, 
-  Clock, 
-  FileText,
   Settings,
   ChevronRight,
-  ExternalLink
+  ExternalLink,
+  Search
 } from "lucide-react";
 import { 
   mockProjects, 
   getEpisodesByProject,
+  getUpcomingEpisode,
   type Project,
-  type Episode 
+  type Episode,
+  type UpcomingEpisode 
 } from "~/lib/mock-data";
 
 export default function ProjectDetailPage() {
   const params = useParams();
   const project = mockProjects.find(p => p.id === params.id);
   const episodes = getEpisodesByProject(params.id as string);
+  const upcoming = getUpcomingEpisode(params.id as string);
   
-  const [isPausing, setIsPausing] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
 
   if (!project) {
     return (
@@ -54,6 +53,10 @@ export default function ProjectDetailPage() {
     });
   };
 
+  const getDayOfWeek = (date: Date) => {
+    return date.toLocaleDateString('en-GB', { weekday: 'long' }).toUpperCase();
+  };
+
   const getProjectInitials = (title: string) => {
     return title
       .split(' ')
@@ -63,21 +66,42 @@ export default function ProjectDetailPage() {
       .toUpperCase();
   };
 
-  const handlePauseToggle = async () => {
-    setIsPausing(true);
-    // Simulate API call
-    await new Promise(resolve => setTimeout(resolve, 500));
-    // In real app, would update via API
-    project.isPaused = !project.isPaused;
-    setIsPausing(false);
+  // Calculate time until influence deadline
+  const getInfluenceTime = (deadline?: Date) => {
+    if (!deadline) return null;
+    const now = new Date();
+    const hours = Math.floor((deadline.getTime() - now.getTime()) / (1000 * 60 * 60));
+    if (hours <= 0) return null;
+    return `${hours} hours`;
   };
 
+  // Separate and filter episodes
   const publishedEpisodes = episodes.filter(e => e.status === "PUBLISHED");
-  const draftEpisodes = episodes.filter(e => e.status === "DRAFT");
+  const latestEpisode = publishedEpisodes[0];
+  const previousEpisodes = publishedEpisodes.slice(1);
+  
+  // Search filter for previous episodes
+  const filteredPrevious = useMemo(() => {
+    const query = searchQuery.trim().toLowerCase();
+    if (!query) return previousEpisodes;
+    return previousEpisodes.filter(e => 
+      e.title.toLowerCase().includes(query) || 
+      e.summary.toLowerCase().includes(query)
+    );
+  }, [searchQuery, previousEpisodes]);
+
+  // Activity tracking (would come from localStorage in production)
+  const isNew = (episode: Episode) => {
+    if (!episode.publishedAt) return false;
+    const daysSincePublish = Math.floor(
+      (new Date().getTime() - episode.publishedAt.getTime()) / (1000 * 60 * 60 * 24)
+    );
+    return daysSincePublish <= 7;
+  };
 
   return (
     <div className="min-h-screen bg-stone-50">
-      {/* Header */}
+      {/* Minimal Header */}
       <header className="bg-white border-b border-stone-200">
         <div className="max-w-6xl mx-auto px-6 py-6">
           <div className="flex items-center justify-between">
@@ -88,9 +112,9 @@ export default function ProjectDetailPage() {
               >
                 <ArrowLeft className="w-5 h-5" />
               </Link>
-              <div className="flex items-center space-x-4">
+              <div className="flex items-center space-x-3">
                 <div 
-                  className={`w-12 h-12 rounded-full flex items-center justify-center text-base font-semibold ${
+                  className={`w-10 h-10 rounded-full flex items-center justify-center text-sm font-semibold ${ 
                     project.isPaused 
                       ? 'bg-stone-100 text-stone-500 border border-stone-300' 
                       : 'bg-gradient-to-br from-stone-100 to-stone-200 text-stone-700 border border-stone-300'
@@ -99,248 +123,193 @@ export default function ProjectDetailPage() {
                   {getProjectInitials(project.title)}
                 </div>
                 <div>
-                  <h1 className="text-2xl font-bold text-stone-900">{project.title}</h1>
-                  <p className="text-stone-600 mt-1">{project.description}</p>
+                  <h1 className="text-xl font-semibold text-stone-900">{project.title}</h1>
+                  <p className="text-xs uppercase tracking-wider text-stone-500 mt-0.5">
+                    {project.cadenceType} INTELLIGENCE • {publishedEpisodes.length} EPISODES • {project.isPaused ? 'PAUSED' : 'ACTIVE'}
+                  </p>
                 </div>
               </div>
             </div>
-            <div className="flex items-center space-x-3">
-              <Button
-                variant="outline"
-                onClick={handlePauseToggle}
-                disabled={isPausing}
-                className="border-stone-300"
-              >
-                {project.isPaused ? (
-                  <>
-                    <Play className="w-4 h-4 mr-2" />
-                    Resume
-                  </>
-                ) : (
-                  <>
-                    <Pause className="w-4 h-4 mr-2" />
-                    Pause
-                  </>
-                )}
-              </Button>
-              <Button variant="outline" className="border-stone-300">
-                <Settings className="w-4 h-4 mr-2" />
-                Settings
-              </Button>
-            </div>
+            <Button variant="ghost" size="sm" className="text-stone-600">
+              <Settings className="w-4 h-4" />
+            </Button>
           </div>
         </div>
       </header>
 
-      <div className="max-w-6xl mx-auto px-6 py-8">
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          {/* Main Content - Episodes */}
-          <div className="lg:col-span-2 space-y-6">
-            {/* Published Episodes */}
-            {publishedEpisodes.length > 0 && (
-              <div>
-                <h2 className="text-lg font-semibold text-stone-900 mb-4">
-                  Published Episodes
-                </h2>
+      <div className="max-w-6xl mx-auto px-6 py-12">
+        {/* Hero Episode Section */}
+        {latestEpisode && (
+          <article className="mb-16 animate-fade-in">
+            {/* Episode Metadata */}
+            <div className="flex items-center gap-4 mb-8">
+              <span className="text-xs uppercase tracking-wider text-stone-500 font-medium">
+                Episode {latestEpisode.sequence}
+              </span>
+              <span className="w-1 h-1 bg-stone-300 rounded-full" />
+              <span className="text-xs uppercase tracking-wider text-stone-500">
+                {latestEpisode.readingMinutes} min read
+              </span>
+              {isNew(latestEpisode) && (
+                <>
+                  <span className="w-1 h-1 bg-stone-300 rounded-full" />
+                  <Badge className="bg-blue-100 text-blue-700 border-0 text-xs">NEW</Badge>
+                </>
+              )}
+            </div>
+
+            {/* Hero Title - Editorial Style */}
+            <h2 className="text-4xl md:text-5xl font-serif font-bold text-stone-900 leading-tight mb-6 max-w-4xl">
+              {latestEpisode.title}
+            </h2>
+
+            {/* Pull Quote - Visual Interest */}
+            {latestEpisode.highlightQuote && (
+              <div className="relative mb-8">
+                <div className="absolute inset-0 bg-gradient-to-br from-stone-50 to-transparent rounded-lg opacity-50" />
+                <blockquote className="relative border-l-4 border-stone-900 pl-6 py-4">
+                  <p className="text-xl md:text-2xl font-serif italic text-stone-800 leading-relaxed">
+                    "{latestEpisode.highlightQuote}"
+                  </p>
+                </blockquote>
+              </div>
+            )}
+
+            {/* Episode Summary */}
+            <p className="text-lg text-stone-600 leading-relaxed mb-6 max-w-3xl">
+              {latestEpisode.summary}
+            </p>
+
+            {/* Sources Count */}
+            {latestEpisode.sources && latestEpisode.sources.length > 0 && (
+              <div className="flex items-center text-sm text-stone-500 mb-8">
+                <ExternalLink className="w-3 h-3 mr-1.5" />
+                {latestEpisode.sources.length} sources cited
+              </div>
+            )}
+
+            {/* CTA Button */}
+            <Link href={`/episodes/${latestEpisode.id}`}>
+              <Button 
+                size="lg"
+                className="bg-stone-900 hover:bg-stone-800 text-white font-medium px-6 py-3 transition-all duration-300 hover:shadow-lg hover:-translate-y-0.5"
+              >
+                Read episode
+                <span className="ml-2 transition-transform group-hover:translate-x-1">→</span>
+              </Button>
+            </Link>
+          </article>
+        )}
+
+        {/* Divider */}
+        <div className="h-px bg-gradient-to-r from-transparent via-stone-200 to-transparent mb-12" />
+
+        {/* Upcoming Episode Preview */}
+        {upcoming && upcoming.status === 'scheduled' && (
+          <section className="mb-16 animate-fade-in" style={{ animationDelay: '0.2s' }}>
+            <h3 className="text-xs uppercase tracking-wider text-stone-500 font-medium mb-6">
+              COMING {getDayOfWeek(upcoming.scheduledAt)}
+            </h3>
+            
+            {upcoming.previewQuestions && upcoming.previewQuestions.length > 0 && (
+              <div className="space-y-4 mb-6">
+                {upcoming.previewQuestions.map((question, i) => (
+                  <div key={i} className="flex items-start gap-3">
+                    <span className="text-stone-400 mt-0.5">→</span>
+                    <p className="text-base text-stone-700 leading-relaxed">{question}</p>
+                  </div>
+                ))}
+              </div>
+            )}
+            
+            {upcoming.influenceDeadline && getInfluenceTime(upcoming.influenceDeadline) && (
+              <p className="text-sm text-stone-500">
+                You can influence this episode for another {getInfluenceTime(upcoming.influenceDeadline)}
+              </p>
+            )}
+          </section>
+        )}
+
+        {/* Previous Episodes */}
+        {previousEpisodes.length > 0 && (
+          <>
+            <div className="h-px bg-gradient-to-r from-transparent via-stone-200 to-transparent mb-12" />
+            
+            <section className="animate-fade-in" style={{ animationDelay: '0.4s' }}>
+              <div className="flex items-center justify-between mb-6">
+                <h3 className="text-xs uppercase tracking-wider text-stone-500 font-medium">
+                  PREVIOUS EPISODES
+                </h3>
+              </div>
+              
+              {/* Search Bar */}
+              <div className="relative mb-8">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-stone-400" />
+                <Input
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  placeholder="Search episodes..."
+                  className="pl-10 bg-white border-stone-200 focus:border-stone-400 transition-colors"
+                />
+              </div>
+              
+              {/* Episode List */}
+              {filteredPrevious.length === 0 ? (
+                <p className="text-sm text-stone-500">
+                  {searchQuery ? "No matches found." : "No previous episodes."}
+                </p>
+              ) : (
                 <div className="space-y-4">
-                  {publishedEpisodes.map((episode) => (
-                    <Link 
+                  {filteredPrevious.map((episode) => (
+                    <Link
                       key={episode.id}
                       href={`/episodes/${episode.id}`}
                       className="block"
                     >
-                      <Card className="bg-white border-stone-200 hover:shadow-lg hover:-translate-y-0.5 transition-all duration-300 cursor-pointer">
+                      <Card className="bg-white border-stone-200 hover:shadow-lg hover:-translate-y-0.5 transition-all duration-300 cursor-pointer group">
                         <CardContent className="p-6">
                           <div className="flex items-start justify-between">
                             <div className="flex-1">
-                              <div className="flex items-center space-x-2 mb-2">
-                                <Badge variant="secondary" className="bg-stone-100 text-stone-600">
+                              <div className="flex items-center gap-2 mb-2">
+                                <Badge variant="secondary" className="bg-stone-100 text-stone-600 text-xs">
                                   Episode {episode.sequence}
                                 </Badge>
-                                <span className="text-sm text-stone-500">
-                                  {formatDate(episode.publishedAt)}
-                                </span>
-                                <span className="text-sm text-stone-500">
-                                  • {episode.readingMinutes} min read
-                                </span>
+                                {isNew(episode) && (
+                                  <Badge className="bg-blue-100 text-blue-700 border-0 text-xs">NEW</Badge>
+                                )}
                               </div>
-                              <h3 className="text-lg font-semibold text-stone-900 mb-2">
+                              <h4 className="font-semibold text-stone-900 group-hover:text-stone-700 transition-colors mb-2">
                                 {episode.title}
-                              </h3>
-                              <p className="text-stone-600 line-clamp-2">
+                              </h4>
+                              <p className="text-sm text-stone-600 line-clamp-2 mb-3">
                                 {episode.summary}
                               </p>
-                              {episode.highlightQuote && (
-                                <blockquote className="mt-3 pl-4 border-l-2 border-stone-300 text-stone-700 italic">
-                                  "{episode.highlightQuote}"
-                                </blockquote>
-                              )}
-                              {episode.sources && episode.sources.length > 0 && (
-                                <div className="mt-3 flex items-center text-sm text-stone-500">
-                                  <ExternalLink className="w-3 h-3 mr-1" />
-                                  {episode.sources.length} sources cited
-                                </div>
-                              )}
+                              <div className="flex items-center gap-4 text-xs text-stone-500">
+                                <span>{formatDate(episode.publishedAt)}</span>
+                                <span>•</span>
+                                <span>{episode.readingMinutes} min read</span>
+                                {episode.sources && episode.sources.length > 0 && (
+                                  <>
+                                    <span>•</span>
+                                    <span className="flex items-center">
+                                      <ExternalLink className="w-3 h-3 mr-1" />
+                                      {episode.sources.length} sources
+                                    </span>
+                                  </>
+                                )}
+                              </div>
                             </div>
-                            <ChevronRight className="w-5 h-5 text-stone-400 ml-4 flex-shrink-0" />
+                            <ChevronRight className="w-5 h-5 text-stone-400 group-hover:text-stone-600 transition-colors ml-4 flex-shrink-0" />
                           </div>
                         </CardContent>
                       </Card>
                     </Link>
                   ))}
                 </div>
-              </div>
-            )}
-
-            {/* Draft Episodes */}
-            {draftEpisodes.length > 0 && (
-              <div>
-                <h2 className="text-lg font-semibold text-stone-900 mb-4">
-                  Upcoming Episodes
-                </h2>
-                <div className="space-y-4">
-                  {draftEpisodes.map((episode) => (
-                    <Card key={episode.id} className="bg-white border-stone-200 opacity-60">
-                      <CardContent className="p-6">
-                        <div className="flex items-center space-x-2 mb-2">
-                          <Badge variant="outline" className="border-stone-300 text-stone-500">
-                            Draft
-                          </Badge>
-                          <span className="text-sm text-stone-500">
-                            Episode {episode.sequence}
-                          </span>
-                        </div>
-                        <h3 className="text-lg font-semibold text-stone-700 mb-2">
-                          {episode.title}
-                        </h3>
-                        <p className="text-stone-500 line-clamp-2">
-                          {episode.summary}
-                        </p>
-                      </CardContent>
-                    </Card>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {/* Empty State */}
-            {episodes.length === 0 && (
-              <Card className="bg-white border-stone-200">
-                <CardContent className="py-12 text-center">
-                  <FileText className="w-12 h-12 text-stone-300 mx-auto mb-4" />
-                  <h3 className="text-lg font-semibold text-stone-900 mb-2">
-                    No episodes yet
-                  </h3>
-                  <p className="text-stone-600">
-                    {project.isPaused 
-                      ? "Resume this project to start generating episodes"
-                      : "Your first episode will be generated soon"}
-                  </p>
-                </CardContent>
-              </Card>
-            )}
-          </div>
-
-          {/* Sidebar - Project Info */}
-          <div className="space-y-6">
-            {/* Status Card */}
-            <Card className="bg-white border-stone-200">
-              <CardHeader>
-                <CardTitle className="text-base">Project Status</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <span className="text-sm text-stone-600">Status</span>
-                  <div className="flex items-center space-x-2">
-                    <div className={`w-2 h-2 rounded-full ${
-                      project.isPaused ? 'bg-stone-300' : 'bg-green-500'
-                    }`} />
-                    <span className="text-sm font-medium">
-                      {project.isPaused ? 'Paused' : 'Active'}
-                    </span>
-                  </div>
-                </div>
-                
-                <Separator className="bg-stone-100" />
-                
-                <div className="flex items-center justify-between">
-                  <span className="text-sm text-stone-600">Cadence</span>
-                  <span className="text-sm font-medium capitalize">
-                    {project.cadenceType.toLowerCase()}
-                  </span>
-                </div>
-                
-                <Separator className="bg-stone-100" />
-                
-                <div className="flex items-center justify-between">
-                  <span className="text-sm text-stone-600">Next Episode</span>
-                  <span className="text-sm font-medium">
-                    {project.isPaused ? "Paused" : formatDate(project.nextScheduledAt)}
-                  </span>
-                </div>
-                
-                {project.lastPublishedAt && (
-                  <>
-                    <Separator className="bg-stone-100" />
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm text-stone-600">Last Published</span>
-                      <span className="text-sm font-medium">
-                        {formatDate(project.lastPublishedAt)}
-                      </span>
-                    </div>
-                  </>
-                )}
-                
-                <Separator className="bg-stone-100" />
-                
-                <div className="flex items-center justify-between">
-                  <span className="text-sm text-stone-600">Total Episodes</span>
-                  <span className="text-sm font-medium">
-                    {publishedEpisodes.length} published
-                  </span>
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Project Brief */}
-            {project.onboardingBrief && (
-              <Card className="bg-white border-stone-200">
-                <CardHeader>
-                  <CardTitle className="text-base">Project Brief</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div>
-                    <h4 className="text-sm font-medium text-stone-700 mb-2">Context</h4>
-                    <p className="text-sm text-stone-600">
-                      {project.onboardingBrief.context}
-                    </p>
-                  </div>
-                  
-                  <div>
-                    <h4 className="text-sm font-medium text-stone-700 mb-2">Focus Areas</h4>
-                    <ul className="text-sm text-stone-600 space-y-1">
-                      {project.onboardingBrief.focusAreas.map((area, i) => (
-                        <li key={i}>• {area}</li>
-                      ))}
-                    </ul>
-                  </div>
-                  
-                  <div>
-                    <h4 className="text-sm font-medium text-stone-700 mb-2">Preferences</h4>
-                    <div className="space-y-1">
-                      <p className="text-sm text-stone-600">
-                        <span className="font-medium">Tone:</span> {project.onboardingBrief.preferences.tone}
-                      </p>
-                      <p className="text-sm text-stone-600">
-                        <span className="font-medium">Speculation:</span> {project.onboardingBrief.preferences.speculationLevel}
-                      </p>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            )}
-          </div>
-        </div>
+              )}
+            </section>
+          </>
+        )}
       </div>
     </div>
   );
