@@ -249,3 +249,97 @@ The mock data structure successfully represents:
 3. Connect real data sources
 4. Implement localStorage for activity tracking
 5. Add settings menu functionality
+
+---
+
+## Day 5 - Unified Design System Implementation
+
+### The Problem
+- **Visual Disconnect**: Episode reader felt like The Atlantic (premium editorial) while project pages felt like Notion (functional SaaS)
+- **Typography Inconsistency**: Episode reader used serif, everything else was sans-serif
+- **Navigation Mismatch**: Different nav patterns created jarring transitions
+- **Background Colors**: Mix of white and stone-50 felt inconsistent
+
+### Design System Decision: Option C
+After analyzing three options, chose **"Intelligence Publication Platform"** approach:
+- Brings editorial elements to functional pages without sacrificing usability
+- Vision: "The Economist meets Substack"
+- Unified serif typography for all major headings
+- Context-aware navigation (full vs minimal)
+
+### Implementation Phases Completed
+
+#### Phase 1: Typography Foundation ✅
+- Added Lora serif font to project
+- Configured font-serif in Tailwind v4 theme
+- Updated root layout with font variables
+
+#### Phase 2: Project Detail Page ✅
+- Converted to minimal auto-hide navigation
+- Centered editorial hero section with 4-5xl serif titles
+- Added pull quotes with balanced text wrapping
+- White background throughout for premium feel
+- Generous whitespace (py-16 for hero, p-8 for cards)
+
+#### Phase 3: Projects List Page ✅
+- Large serif page title "Your Projects" (3-4xl)
+- All project card titles now use serif (2xl)
+- Improved empty state with editorial treatment
+- Refined metadata display with uppercase tracking
+- Moved "New project" button to toolbar
+
+#### Phase 4: Unified Navigation ✅
+- Dashboard layout now context-aware
+- Minimal nav for `/episodes/*` and `/projects/[id]`
+- Full nav for list pages and dashboard
+- Auto-hide behavior on scroll for minimal nav
+- Consistent height and styling across modes
+
+#### Phase 5: Polish & Consistency ✅
+- Standardized hover states: shadow-xl, -translate-y-1
+- All transitions: 300ms for consistency
+- White backgrounds throughout (not stone-50)
+- Border colors unified to stone-200
+
+### Key Design Patterns Established
+
+**Three-Zone Layout System:**
+1. **Zone 1: Editorial** - Centered, generous spacing, serif titles
+2. **Zone 2: Functional** - Efficient grids and lists, still spacious
+3. **Zone 3: Metadata** - Subtle, supportive, uppercase tracking
+
+**Typography Hierarchy:**
+- H1: font-serif, text-4xl md:text-5xl (major page titles)
+- H2: font-serif, text-2xl md:text-3xl (section headers, cards)
+- H3: font-sans, text-xl (subsections)
+- Body: font-sans for UI, font-serif for reading
+
+**Navigation Modes:**
+1. Full Navigation: Projects, Dashboard
+2. Minimal Navigation: Episodes, Project detail (auto-hides)
+3. Hybrid Navigation: Future long-form pages
+
+### What's Working Well
+- Seamless visual flow between pages
+- Premium "Intelligence Publication" feel throughout
+- Typography creates clear hierarchy
+- Navigation adapts naturally to context
+- Every page feels editorial, not just episodes
+
+### Documentation Updates
+- Created comprehensive unified design system plan
+- Updated design language document with new patterns
+- All PRDs and ADRs moved to consolidated folder
+- Clear implementation guide for future pages
+
+### Technical Details
+- Next.js 15 params handling with React.use()
+- usePathname() for context-aware navigation
+- Auto-hide nav with scroll direction detection
+- Tailwind v4 with @theme configuration
+
+### Deployment Status
+- All changes committed with detailed message
+- Successfully pushed to GitHub main branch
+- Vercel auto-deploying updates
+- Design system fully implemented across all pages

@@ -115,13 +115,14 @@ Once we prove that, we can add everything else.
 
 ### Infrastructure Setup
 - [x] Deploy with Vercel (configured with root directory)
-- [ ] Scaffold basic UI with mock data (IN PROGRESS)
+- [x] Scaffold basic UI with mock data
   - [x] Setup shadcn/ui with stone theme
-  - [ ] Create mock data structure with orgs
-  - [ ] Build dashboard layout
-  - [ ] Build projects page
-  - [ ] Build episode reader
-  - [ ] Build new project conversation
+  - [x] Create mock data structure with orgs
+  - [x] Build dashboard layout
+  - [x] Build projects page
+  - [x] Build episode reader
+  - [x] Build new project conversation
+  - [x] Implement unified design system
 - [ ] Set up database with Supabase
 - [ ] Attach database to UI
 - [ ] Add authentication with Clerk
@@ -182,21 +183,49 @@ const data = await db.query.findMany({
 });
 ```
 
-### UI/UX Design System
+### UI/UX Design System (Unified Editorial Design)
+
+#### Core Design Philosophy
+- **"Intelligence Publication Platform"** - The Economist meets Substack
+- **Editorial elements on functional pages** without sacrificing usability
+- **Serif typography for all major headings** (Lora font family)
+- **Context-aware navigation** (full for lists, minimal for reading)
+
+#### Typography System
+```typescript
+// Font Stack
+- Serif: Lora, Charter, Georgia (major headings, episode content)
+- Sans: Inter, system-ui (UI text, metadata)
+
+// Hierarchy
+- H1: font-serif text-4xl md:text-5xl (hero titles)
+- H2: font-serif text-2xl md:text-3xl (cards, sections)
+- H3: font-sans text-xl (subsections)
+- Body: font-sans (UI), font-serif (reading)
+```
 
 #### Component Library
 - **Framework**: shadcn/ui (New York style)
-- **Base Color**: Stone (stone-50 to stone-950)
-- **Typography**: Tailwind Typography plugin for prose
+- **Primary Background**: White (not stone-50)
+- **Borders**: stone-200 throughout
+- **Hover States**: shadow-xl, -translate-y-1, 300ms transitions
 - **Icons**: Lucide React
+
+#### Navigation Patterns
+```typescript
+// Context-aware navigation modes
+1. Full Navigation: Projects list, Dashboard
+2. Minimal Navigation: Episodes, Project detail (auto-hides on scroll)
+3. Navigation handled by dashboard layout based on pathname
+```
 
 #### Page Structure
 ```
 app/
 ├── (dashboard)/       # Authenticated routes
-│   ├── layout.tsx    # Nav with org context
+│   ├── layout.tsx    # Context-aware nav
 │   ├── projects/     
-│   │   ├── page.tsx  # Projects list
+│   │   ├── page.tsx  # Projects list (serif titles)
 │   │   └── new/      # Conversational UI
 │   └── episodes/
 │       └── [id]/     # Episode reader
