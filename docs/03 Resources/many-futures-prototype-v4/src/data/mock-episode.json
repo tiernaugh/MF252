@@ -1,0 +1,269 @@
+{
+  "id": "ep_a4b3c2d1",
+  "title": "The Great Client Expectation Shift",
+  "subtitle": "What financial services clients are actually hiring design consultancies for in the AI era",
+  "project": {
+    "id": "proj_s1a2r3a4",
+    "name": "AI impact on design consultancy"
+  },
+  "accessControl": [
+    { "type": "user", "id": "user_2i3B4c5D6e7F8g9H" }
+  ],
+  "metadata": {
+    "episodeNumber": 4,
+    "publicationTimestamp": "2025-08-01T09:00:00Z",
+    "readingTimeMinutes": 8,
+    "generationMetrics": {
+      "agentId": "futura-v1.3-sonnet",
+      "startTime": "2025-07-31T10:00:00Z",
+      "endTime": "2025-07-31T10:15:00Z",
+      "durationMs": 900000,
+      "costUsd": 0.78,
+      "modelsUsed": ["claude-3-opus-20240229", "perplexity-sonar-pro"],
+      "promptTemplateVersion": "ep_gen_v1.1",
+      "memoryLinkage": ["mem_client_expectations_q2_25", "mem_ai_in_finance_regs"]
+    }
+  },
+  "content": [
+    {
+      "id": "blk_co_001",
+      "type": "coldOpen",
+      "order": 10,
+      "content": {
+        "paragraphs": [
+          "I've been tracking something that's making me rethink everything about client-consultancy relationships in the AI era, and it's not what I expected.",
+          "Everyone's focused on how AI will change what consultancies do internally—faster research, automated tasks, improved efficiency. But I'm seeing signals that suggest the real transformation is happening on the client side. The question isn't \"How will AI help consultancies work better?\" It's \"What do clients actually need from consultancies when they have AI tools themselves?\"",
+          "The more I dig into this, the more I think we're witnessing a fundamental shift in why clients hire external expertise—and it's creating opportunities that most consultancies aren't even aware of yet."
+        ]
+      }
+    },
+    {
+      "id": "blk_es_001",
+      "type": "executiveSummary",
+      "order": 20,
+      "content": {
+        "title": "Three possibilities I'm exploring about client-consultancy relationships:",
+        "points": [
+          "The Navigation Partner Future: Clients increasingly need help making sense of AI possibilities and navigating implementation decisions, not just executing predetermined solutions",
+          "The Collaboration Facilitation Future: The most valuable consultancy skill becomes helping organizations manage human-AI partnerships effectively",
+          "The Reckoning Response Future: As AI hype gives way to accountability, clients need partners who can deliver demonstrable business value from AI investments"
+        ]
+      }
+    },
+    {
+      "id": "blk_sh_001",
+      "type": "sectionHeader",
+      "order": 30,
+      "content": {
+        "title": "Section 1: The Signal I Can't Ignore"
+      }
+    },
+    {
+      "id": "blk_sig_001",
+      "type": "signal",
+      "order": 40,
+      "content": {
+        "paragraphs": [
+          "Here's what caught my attention: 86% of consulting buyers are now actively looking for advisory services that incorporate AI and technology assets. But here's the twist—89% simply expect that consulting services of any kind should incorporate AI for improved productivity and quality.",
+          "That gap between \"actively looking for\" and \"simply expecting\" tells a story. Clients aren't just shopping for AI expertise anymore; they're assuming it's table stakes. Which makes me wonder: what are they actually hiring consultancies for if AI capabilities are becoming the baseline expectation?"
+        ],
+        "source": {
+          "text": "Source: Accenture Consulting Report, Q2 2025",
+          "url": "#"
+        }
+      },
+      "citations": [
+        {
+          "index": "1",
+          "sourceTitle": "Accenture Consulting Report, Q2 2025",
+          "url": "https://example.com/accenture-q2-2025",
+          "excerpt": "86% of buyers actively seek AI-enabled advisory; 89% expect AI in services.",
+          "publicationDate": "2025-06-15",
+          "credibility": 0.85
+        }
+      ]
+    },
+    {
+      "id": "blk_sig_002",
+      "type": "signal",
+      "order": 50,
+      "content": {
+        "paragraphs": [
+          "I'm seeing another pattern in procurement language. Demand for ethical AI and bias mitigation services has risen by 55%, while interest in explainable AI models has increased by 37%. That's not just technical requirement evolution—that suggests clients are grappling with AI governance challenges they can't solve internally."
+        ],
+        "source": {
+          "text": "Source: Gartner Procurement Analytics, 2025",
+          "url": "#"
+        }
+      },
+      "citations": [
+        {
+          "index": "1",
+          "sourceTitle": "Gartner Procurement Analytics (2025)",
+          "url": "https://example.com/gartner-2025-ethics-xai",
+          "excerpt": "Ethical AI services +55%, explainable AI +37% in RFP language.",
+          "publicationDate": "2025-05-20",
+          "credibility": 0.8
+        }
+      ]
+    },
+    {
+      "id": "blk_q_001",
+      "type": "question",
+      "order": 60,
+      "content": {
+        "questions": [
+          "The question that keeps surfacing: if clients expect consultancies to use AI, but also need help navigating AI complexities, what does that mean for the traditional consulting value proposition?"
+        ]
+      }
+    },
+    {
+      "id": "blk_sh_002",
+      "type": "sectionHeader",
+      "order": 70,
+      "content": {
+        "title": "Section 2: The Reckoning Reality"
+      }
+    },
+    {
+      "id": "blk_pat_001",
+      "type": "pattern",
+      "order": 80,
+      "content": {
+        "paragraphs": [
+          "There's something else happening that feels significant. 2025 is being called \"AI's reckoning moment\" as clients' hope and hype of the last two years give way to expectation—AI products need to demonstrate they can move beyond industry playthings to valuable business tools.",
+          "This isn't just about AI vendors proving their worth. It's about clients becoming more sophisticated buyers who can distinguish between AI theater and AI value. And that sophistication is changing what they need from consultancies.",
+          "What I find fascinating is the contradiction emerging: clients expect AI to make services cheaper due to efficiency gains, but simultaneously demand higher value delivery. This creates productive tension. Clients want the cost benefits of AI automation, but they also want consultancies to solve problems that AI tools alone can't address.",
+          "That gap might be where new value propositions emerge."
+        ],
+        "keyTakeaway": "Clients want both AI efficiency savings and higher-value, human-centric problem-solving, creating a productive tension for consultancies."
+      },
+      "citations": [
+        {
+          "index": "1",
+          "sourceTitle": "McKinsey State of AI 2025",
+          "url": "https://example.com/mckinsey-ai-2025",
+          "excerpt": "Enterprises pivot from pilots to value proof and cost discipline.",
+          "publicationDate": "2025-04-30",
+          "credibility": 0.75
+        }
+      ]
+    },
+    {
+      "id": "blk_poss_001",
+      "type": "possibility",
+      "order": 90,
+      "content": {
+        "paragraphs": [
+          "**The Navigation Challenge**",
+          "I keep encountering this theme: clients with AI tools don't necessarily know what to do with them. Having access to ChatGPT or Claude doesn't automatically translate to strategic AI implementation in financial services with regulatory constraints.",
+          "What if the most valuable consultancy capability becomes \"AI decision navigation\"—helping clients figure out which AI possibilities are worth pursuing, which regulatory risks to consider, and how to structure human-AI collaboration for their specific context?",
+          "This would flip the traditional consulting model. Instead of \"We'll implement this solution for you,\" it becomes \"We'll help you navigate the solution space and make better decisions about AI investments.\"",
+          "For Sarah's design consultancy, this could mean positioning as specialists in helping financial services firms design their AI adoption strategy, not just implementing AI-powered design solutions."
+        ]
+      }
+    },
+    {
+      "id": "blk_sh_003",
+      "type": "sectionHeader",
+      "order": 100,
+      "content": {
+        "title": "Section 3: The Collaboration Complexity"
+      }
+    },
+    {
+      "id": "blk_ten_001",
+      "type": "tension",
+      "order": 110,
+      "content": {
+        "paragraphs": [
+          "Here's another pattern I'm tracking: the complexity of human-AI collaboration in regulated environments. Clients are looking for services that incorporate AI and technology assets, but financial services firms need to maintain human oversight for compliance reasons.",
+          "This creates a design challenge that's both technical and organizational. How do you create workflows where AI augments human creativity without compromising regulatory accountability? How do you design interfaces that make AI-human collaboration feel natural rather than awkward?",
+          "These aren't problems that AI tools solve automatically. They require understanding of both technology capabilities and organizational dynamics—exactly the kind of hybrid expertise that design consultancies could develop."
+        ],
+        "keyTakeaway": "The need to balance AI augmentation with human regulatory oversight creates a complex but valuable design challenge for consultancies."
+      }
+    },
+    {
+      "id": "blk_poss_002",
+      "type": "possibility",
+      "order": 120,
+      "content": {
+        "paragraphs": [
+          "**What This Might Mean for Client Relationships**",
+          "If I'm reading these signals correctly, client relationships might be evolving in several interesting directions:",
+          "**From Implementation to Investigation:** Clients might start hiring consultancies to help them investigate AI possibilities before committing to specific solutions. Less \"build this\" and more \"help us figure out what's worth building.\"",
+          "**From Execution to Education:** As AI capabilities evolve quickly, clients might need ongoing education about new possibilities and risks. Design consultancies could become continuous learning partners rather than project-based solution providers.",
+          "**From Solutions to Systems Thinking:** In regulated environments, AI implementation isn't just about individual tools—it's about how those tools fit into compliance frameworks, risk management systems, and organizational culture.",
+          "Each of these shifts would require different capabilities and different client relationship models."
+        ]
+      }
+    },
+    {
+      "id": "blk_sh_004",
+      "type": "sectionHeader",
+      "order": 130,
+      "content": {
+        "title": "Section 4: The Questions Worth Exploring"
+      }
+    },
+    {
+      "id": "blk_q_002",
+      "type": "question",
+      "order": 140,
+      "content": {
+        "questions": [
+          "What if AI literacy becomes the real bottleneck? If clients have access to powerful AI tools but don't know how to use them strategically, consultancies that can bridge that knowledge gap might become more valuable, not less.",
+          "What if regulatory navigation becomes the premium service? With 37% increase in interest in explainable AI models and rising demand for ethical AI services, understanding how to implement AI within regulatory constraints might be where the highest value lies.",
+          "What if collaboration design becomes a distinct discipline? Designing effective human-AI partnerships might require entirely new approaches that combine UX design, organizational psychology, and technology implementation.",
+          "What if clients start hiring consultancies to help them become better AI buyers? Instead of outsourcing AI implementation, clients might want help developing internal AI strategy and vendor evaluation capabilities."
+        ]
+      }
+    },
+    {
+      "id": "blk_time_001",
+      "type": "timing",
+      "order": 150,
+      "content": {
+        "paragraphs": [
+          "**The Timing Question**",
+          "What's particularly interesting about timing is how quickly client expectations seem to be shifting. 75% of consulting firms are expected to integrate AI into their workflows by 2025, which suggests this transition is happening fast.",
+          "But here's what I'm wondering: if client expectations are evolving faster than consultancy capabilities, there might be a window where firms that develop AI navigation and collaboration design expertise early could capture disproportionate value.",
+          "The risk is that this window might be shorter than traditional capability development cycles. By the time most consultancies build AI-enhanced capabilities, clients might already be looking for the next level of sophistication."
+        ]
+      },
+      "citations": [
+        {
+          "index": "1",
+          "sourceTitle": "Deloitte Tech Trends 2025",
+          "url": "https://example.com/deloitte-tech-trends-2025",
+          "excerpt": "75% of consulting firms integrating AI workflows by 2025.",
+          "publicationDate": "2025-01-18",
+          "credibility": 0.7
+        }
+      ]
+    }
+  ],
+  "researchPlanning": {
+    "title": "What I'm Investigating Next",
+    "paragraphs": [
+      "This exploration has surfaced several research directions that feel worth pursuing:",
+      "**Client Decision-Making Patterns:** How are financial services firms actually making AI investment decisions? What information do they need that they can't get internally?",
+      "**Regulatory Implementation Reality:** What does AI compliance actually look like in practice? Where are firms struggling with the intersection of innovation and regulation?",
+      "**Human-AI Collaboration Design:** Are there emerging best practices for designing effective human-AI partnerships in creative work?",
+      "My instinct is that the regulatory implementation reality might be the most revealing. If firms are struggling with practical compliance challenges, that could create immediate opportunities for consultancies with relevant expertise."
+    ],
+    "userPrompt": "What's your experience with how client expectations are shifting? Are you seeing different types of requests or different ways clients frame AI-related challenges?"
+  },
+  "episodeFeedback": {
+    "title": "How did this episode land?",
+    "prompt": "Which client expectation shift feels most relevant to your experience?",
+    "options": [
+      "Clients needing navigation help rather than implementation services",
+      "Rising demand for AI compliance and ethics expertise",
+      "Interest in human-AI collaboration design",
+      "The shift from hype to accountability in AI investments"
+    ],
+    "followUpPrompt": "What I'm curious about: How are your current clients talking about AI differently than they were six months ago?"
+  }
+}
