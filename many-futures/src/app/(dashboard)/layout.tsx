@@ -1,4 +1,7 @@
+"use client";
+
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { mockUser, mockOrganization } from "~/lib/mock-data";
 
 export default function DashboardLayout({
@@ -6,10 +9,26 @@ export default function DashboardLayout({
 }: {
   children: React.ReactNode;
 }) {
+  const pathname = usePathname();
+  
+  // Determine if we should show minimal navigation
+  // Episodes and individual project pages get minimal nav
+  const isMinimalNav = pathname.startsWith('/episodes/') || /^\/projects\/[^/]+$/.test(pathname);
+  
+  // For minimal nav pages, the navigation is handled within the page itself
+  if (isMinimalNav) {
+    return (
+      <div className="min-h-screen bg-white">
+        {children}
+      </div>
+    );
+  }
+  
+  // Full navigation for other pages
   return (
-    <div className="min-h-screen bg-stone-50">
-      {/* Navigation */}
-      <nav className="bg-white shadow-sm border-b border-stone-200">
+    <div className="min-h-screen bg-white">
+      {/* Full Navigation */}
+      <nav className="bg-white border-b border-stone-200">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
             {/* Left side */}

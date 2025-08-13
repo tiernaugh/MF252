@@ -2,7 +2,8 @@
 
 **Status:** Living Document  
 **Last Updated:** 2025-08-13  
-**Purpose:** Maintain consistency across the product as we iterate
+**Purpose:** Maintain consistency across the product as we iterate  
+**Recent Update:** Implemented unified design system (Option C) - editorial/functional hybrid
 
 ## Core Principles
 
@@ -21,36 +22,44 @@ Every interaction should feel worthwhile. If something takes 7 minutes to read, 
 ## Visual Language
 
 ### Color Philosophy
-We use a **restrained palette** centered on stone tones. Color is functional, not decorative.
+We use a **restrained palette** centered on stone tones with white as primary. Color is functional, not decorative.
 
 ```
 Primary Palette:
-- Stone-50:  Background canvas (off-white)
-- Stone-100: Secondary backgrounds
+- White:     Primary background (reading surfaces)
+- Stone-50:  Secondary backgrounds (cards, sections)
+- Stone-100: Tertiary backgrounds (hover states)
 - Stone-200: Borders, dividers
 - Stone-600: Body text
+- Stone-700: Secondary text
 - Stone-900: Headlines, primary text
 
 Accent Colors (Sparingly):
 - Green-500: Active status (projects running)
 - Stone-300: Paused status (projects paused)
-- Blue-600: Links (only when needed)
+- Blue-600: Links, NEW badges
 - Red-500: Errors (rare, we prevent rather than alert)
 ```
 
 ### Typography Hierarchy
-Clear hierarchy without being heavy-handed. Let the content breathe.
+**Unified serif/sans system** creates editorial feel while maintaining function.
 
 ```
-Headings:
-- H1: text-3xl font-bold (Page titles - rare)
-- H2: text-xl font-semibold (Section headers)
-- H3: text-lg font-medium (Card titles)
+Font Stack:
+- Serif: Lora, Charter, Georgia (major headings, episode content)
+- Sans: Inter, system-ui (UI text, metadata)
+
+Headings (ALL use serif for consistency):
+- H1: font-serif text-4xl md:text-5xl font-bold (Hero titles, major pages)
+- H2: font-serif text-2xl md:text-3xl font-semibold (Section headers, cards)
+- H3: font-sans text-xl font-semibold (Subsections)
+- H4: font-sans text-lg font-medium (Minor headings)
 
 Body:
-- Large: text-base leading-relaxed (Episode content)
-- Regular: text-sm (Metadata, descriptions)
-- Small: text-xs (Timestamps, hints)
+- Reading: font-serif text-lg leading-relaxed (Episode content only)
+- UI Text: font-sans text-base (Descriptions, forms)
+- Small: font-sans text-sm (Metadata)
+- Micro: font-sans text-xs uppercase tracking-wider (Labels, badges)
 ```
 
 ### Spacing System
@@ -66,10 +75,11 @@ Component Spacing:
 ### Component Patterns
 
 #### Cards
-- White background on stone-50 canvas
-- Subtle border (border-stone-200)
-- Hover: shadow-lg with slight lift (-translate-y-0.5)
+- White background on white canvas (unified)
+- Defined border (border-stone-200)
+- Hover: shadow-xl with noticeable lift (-translate-y-1)
 - Transition: 300ms for smooth interactions
+- Padding: p-8 for generous breathing room
 
 #### Status Indicators
 - Small colored dots, not badges (unless prominence needed)
@@ -85,9 +95,13 @@ Component Spacing:
 ## Interaction Patterns
 
 ### Navigation
-- **Fixed top nav**: Clean, minimal, persistent
+- **Context-aware nav**: Full for lists, minimal for reading
+- **Auto-hide on scroll**: Minimal nav hides when scrolling down
 - **No sidebar**: Reduces complexity, maintains focus
-- **Breadcrumbs**: Only when deep in hierarchy
+- **Three modes**:
+  1. Full Navigation (Projects, Dashboard)
+  2. Minimal Navigation (Episodes, Project detail)
+  3. Hybrid Navigation (Future long-form pages)
 
 ### Filtering & Search
 - **Search first**: Prominent search before filters
@@ -133,15 +147,20 @@ Avoid:
 
 ### Principles
 - **Purposeful**: Motion should clarify, not decorate
-- **Subtle**: 200-300ms transitions
+- **Consistent**: 300ms transitions throughout
 - **Natural**: Ease functions, not linear
-- **Consistent**: Same timings across similar actions
+- **Premium feel**: Slightly more lift on hover
 
 ### Common Animations
 ```css
-/* Hover states */
+/* Hover states (unified) */
 transition: all 300ms ease;
-transform: translateY(-2px);
+transform: translateY(-4px); /* -translate-y-1 in Tailwind */
+box-shadow: shadow-xl;
+
+/* Navigation auto-hide */
+transition: transform 300ms ease;
+transform: translateY(-100%) when hidden;
 
 /* Focus states */
 transition: box-shadow 200ms ease;
@@ -184,13 +203,14 @@ Instant navigation (no fade between pages)
 
 ## Component Inventory
 
-### Current Components (Keep Consistent)
-1. **Project Card**: Avatar, title, description, metadata
-2. **Episode Reader**: Typography-focused, feedback stars
-3. **Navigation**: Logo, nav links, org/user context
-4. **Search Bar**: Icon, input, subtle border
-5. **Filter Pills**: Rounded, toggle states
-6. **Buttons**: Primary (dark), Secondary (outline)
+### Current Components (Unified Design)
+1. **Project Card**: Avatar, serif title (2xl), generous padding (p-8)
+2. **Episode Reader**: Centered hero, serif titles (5-6xl), minimal nav
+3. **Project Detail**: Editorial hero section, centered layout, serif headings
+4. **Navigation**: Context-aware (full/minimal), auto-hide behavior
+5. **Search Bar**: Icon, input, consistent borders (stone-200)
+6. **Filter Pills**: Rounded, toggle states, clear active state
+7. **Buttons**: Primary (stone-900), hover states (shadow-xl, -translate-y-1)
 
 ### Planned Components (Future)
 - Payment forms
@@ -199,6 +219,12 @@ Instant navigation (no fade between pages)
 - Email templates
 
 ## Decision Log
+
+### Why Unified Design System (Option C)?
+- Brings editorial elements to functional pages
+- Creates consistent "Intelligence Publication" feel
+- Maintains usability while adding sophistication
+- "The Economist meets Substack" vision
 
 ### Why Stone Colors?
 - Premium without being cold
@@ -218,35 +244,52 @@ Instant navigation (no fade between pages)
 - Each card gets breathing room
 - Natural reading flow
 
-### Why Off-Gray Background?
-- Creates depth without shadows
-- Defines content areas clearly
-- Reduces eye strain
-- Premium publication feel
+### Why White Background?
+- Premium publication feel (like The Economist)
+- Better reading experience
+- Cleaner, more sophisticated
+- Stone accents for cards and sections
+
+### Why Serif Typography?
+- Editorial sophistication
+- Creates clear hierarchy
+- Differentiates from typical SaaS
+- "Intelligence Publication" positioning
 
 ## Usage Examples
 
 ### Creating a New Page
 ```tsx
-// Start with the container
-<div className="min-h-screen bg-stone-50">
-  {/* Sticky header if needed */}
-  <header className="sticky top-0 z-10 bg-white/90 backdrop-blur border-b border-stone-200">
-    ...
-  </header>
+// Start with white background
+<div className="min-h-screen bg-white">
+  {/* Context-aware navigation handled by layout */}
   
-  {/* Content wrapper */}
-  <div className="max-w-6xl mx-auto px-6 py-6">
+  {/* Zone 1: Editorial Hero (if needed) */}
+  <section className="max-w-3xl mx-auto px-8 py-16 text-center">
+    <h1 className="font-serif text-4xl md:text-5xl font-bold">
+      {title}
+    </h1>
+  </section>
+  
+  {/* Zone 2: Functional Content */}
+  <section className="max-w-6xl mx-auto px-6 py-8">
     {/* Your content */}
-  </div>
+  </section>
 </div>
 ```
 
 ### Creating a Card
 ```tsx
-<Card className="bg-white border-stone-200 hover:shadow-lg hover:-translate-y-0.5 transition-all duration-300">
+<Card className="bg-white border border-stone-200 hover:shadow-xl hover:-translate-y-1 transition-all duration-300">
   <CardContent className="p-8">
-    {/* Generous padding, clear hierarchy */}
+    {/* Serif title for editorial feel */}
+    <h3 className="font-serif text-2xl font-semibold text-stone-900">
+      {title}
+    </h3>
+    {/* Sans-serif for body text */}
+    <p className="text-base text-stone-600">
+      {description}
+    </p>
   </CardContent>
 </Card>
 ```

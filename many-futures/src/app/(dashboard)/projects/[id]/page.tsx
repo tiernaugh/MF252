@@ -1,14 +1,13 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, use, useEffect } from "react";
 import Link from "next/link";
-import { useParams } from "next/navigation";
 import { Card, CardContent } from "~/components/ui/card";
 import { Button } from "~/components/ui/button";
 import { Badge } from "~/components/ui/badge";
 import { Input } from "~/components/ui/input";
 import { 
-  ArrowLeft, 
+  Home,
   Settings,
   ChevronRight,
   ExternalLink,
@@ -23,19 +22,44 @@ import {
   type UpcomingEpisode 
 } from "~/lib/mock-data";
 
-export default function ProjectDetailPage() {
-  const params = useParams();
-  const project = mockProjects.find(p => p.id === params.id);
-  const episodes = getEpisodesByProject(params.id as string);
-  const upcoming = getUpcomingEpisode(params.id as string);
+export default function ProjectDetailPage({ params }: { params: Promise<{ id: string }> }) {
+  // Unwrap params promise with React.use()
+  const { id } = use(params);
+  
+  const project = mockProjects.find(p => p.id === id);
+  const episodes = getEpisodesByProject(id);
+  const upcoming = getUpcomingEpisode(id);
   
   const [searchQuery, setSearchQuery] = useState("");
+  const [isNavVisible, setIsNavVisible] = useState(true);
+  const [lastScrollY, setLastScrollY] = useState(0);
+
+  // Auto-hide navigation on scroll
+  useEffect(() => {
+    const handleScroll = () => {
+      const currentScrollY = window.scrollY;
+      
+      // Show nav when scrolling up or at top
+      if (currentScrollY < lastScrollY || currentScrollY < 10) {
+        setIsNavVisible(true);
+      } 
+      // Hide nav when scrolling down
+      else if (currentScrollY > lastScrollY && currentScrollY > 100) {
+        setIsNavVisible(false);
+      }
+      
+      setLastScrollY(currentScrollY);
+    };
+
+    window.addEventListener("scroll", handleScroll, { passive: true });
+    return () => window.removeEventListener("scroll", handleScroll);
+  }, [lastScrollY]);
 
   if (!project) {
     return (
-      <div className="min-h-screen bg-stone-50 flex items-center justify-center">
+      <div className="min-h-screen bg-white flex items-center justify-center">
         <div className="text-center">
-          <h1 className="text-2xl font-bold text-stone-900 mb-2">Project not found</h1>
+          <h1 className="text-3xl font-serif font-bold text-stone-900 mb-4">Project not found</h1>
           <Link href="/projects" className="text-blue-600 hover:text-blue-700">
             ← Back to projects
           </Link>
@@ -100,119 +124,109 @@ export default function ProjectDetailPage() {
   };
 
   return (
-    <div className="min-h-screen bg-stone-50">
-      {/* Minimal Header */}
-      <header className="bg-white border-b border-stone-200">
-        <div className="max-w-6xl mx-auto px-6 py-6">
+    <div className="min-h-screen bg-white">
+      {/* Minimal Navigation with Auto-Hide */}
+      <nav className={`fixed top-0 left-0 right-0 z-20 bg-white/95 backdrop-blur-sm border-b border-stone-100 transition-transform duration-300 ${
+        isNavVisible ? 'translate-y-0' : '-translate-y-full'
+      }`}>
+        <div className="max-w-3xl mx-auto px-6 py-4">
           <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-4">
-              <Link 
-                href="/projects"
-                className="text-stone-600 hover:text-stone-900 transition-colors"
-              >
-                <ArrowLeft className="w-5 h-5" />
-              </Link>
-              <div className="flex items-center space-x-3">
-                <div 
-                  className={`w-10 h-10 rounded-full flex items-center justify-center text-sm font-semibold ${ 
-                    project.isPaused 
-                      ? 'bg-stone-100 text-stone-500 border border-stone-300' 
-                      : 'bg-gradient-to-br from-stone-100 to-stone-200 text-stone-700 border border-stone-300'
-                  }`}
-                >
-                  {getProjectInitials(project.title)}
-                </div>
-                <div>
-                  <h1 className="text-xl font-semibold text-stone-900">{project.title}</h1>
-                  <p className="text-xs uppercase tracking-wider text-stone-500 mt-0.5">
-                    {project.cadenceType} INTELLIGENCE • {publishedEpisodes.length} EPISODES • {project.isPaused ? 'PAUSED' : 'ACTIVE'}
-                  </p>
-                </div>
-              </div>
-            </div>
-            <Button variant="ghost" size="sm" className="text-stone-600">
-              <Settings className="w-4 h-4" />
-            </Button>
+            {/* Home Icon */}
+            <Link 
+              href="/projects"
+              className="p-2 rounded-lg hover:bg-stone-50 transition-colors"
+              aria-label="Back to projects"
+            >
+              <Home className="w-5 h-5 text-stone-600" />
+            </Link>
+            
+            {/* Project Name */}
+            <span className="text-sm text-stone-600">
+              {project.title}
+            </span>
+            
+            {/* Settings Icon */}
+            <button
+              className="p-2 rounded-lg hover:bg-stone-50 transition-colors"
+              aria-label="Project settings"
+            >
+              <Settings className="w-5 h-5 text-stone-600" />
+            </button>
           </div>
         </div>
-      </header>
+      </nav>
 
-      <div className="max-w-6xl mx-auto px-6 py-12">
-        {/* Hero Episode Section */}
+      {/* Main Content */}
+      <div className="pt-24">
+        {/* Zone 1: Editorial Hero - Centered */}
         {latestEpisode && (
-          <article className="mb-16 animate-fade-in">
-            {/* Episode Metadata */}
-            <div className="flex items-center gap-4 mb-8">
-              <span className="text-xs uppercase tracking-wider text-stone-500 font-medium">
-                Episode {latestEpisode.sequence}
-              </span>
-              <span className="w-1 h-1 bg-stone-300 rounded-full" />
-              <span className="text-xs uppercase tracking-wider text-stone-500">
-                {latestEpisode.readingMinutes} min read
-              </span>
+          <section className="max-w-3xl mx-auto px-8 py-16 text-center">
+            {/* Episode Badge */}
+            <span className="inline-block px-4 py-2 bg-stone-100 text-stone-700 text-sm font-medium rounded-full mb-8">
+              Episode {latestEpisode.sequence}
+            </span>
+            
+            {/* Hero Title - Large Serif, Centered */}
+            <h2 className="font-serif text-4xl md:text-5xl font-bold text-stone-900 mb-8 leading-tight max-w-[20ch] mx-auto" 
+                style={{ textWrap: 'balance' as any }}>
+              {latestEpisode.title}
+            </h2>
+            
+            {/* Pull Quote - Visual Interest */}
+            {latestEpisode.highlightQuote && (
+              <blockquote className="my-10 py-6 border-t border-b border-stone-200">
+                <p className="text-2xl font-serif italic text-stone-700 leading-relaxed">
+                  "{latestEpisode.highlightQuote}"
+                </p>
+              </blockquote>
+            )}
+            
+            {/* Summary */}
+            <p className="text-lg text-stone-600 leading-relaxed mb-8 max-w-2xl mx-auto">
+              {latestEpisode.summary}
+            </p>
+            
+            {/* Metadata */}
+            <div className="flex items-center justify-center gap-4 text-sm text-stone-500 mb-10">
+              <span>{latestEpisode.readingMinutes} min read</span>
+              {latestEpisode.sources && latestEpisode.sources.length > 0 && (
+                <>
+                  <span className="w-1 h-1 bg-stone-300 rounded-full" />
+                  <span className="flex items-center">
+                    <ExternalLink className="w-3 h-3 mr-1.5" />
+                    {latestEpisode.sources.length} sources
+                  </span>
+                </>
+              )}
               {isNew(latestEpisode) && (
                 <>
                   <span className="w-1 h-1 bg-stone-300 rounded-full" />
-                  <Badge className="bg-blue-100 text-blue-700 border-0 text-xs">NEW</Badge>
+                  <Badge className="bg-blue-100 text-blue-700 border-0 text-xs uppercase tracking-wider">NEW</Badge>
                 </>
               )}
             </div>
-
-            {/* Hero Title - Editorial Style */}
-            <h2 className="text-4xl md:text-5xl font-serif font-bold text-stone-900 leading-tight mb-6 max-w-4xl">
-              {latestEpisode.title}
-            </h2>
-
-            {/* Pull Quote - Visual Interest */}
-            {latestEpisode.highlightQuote && (
-              <div className="relative mb-8">
-                <div className="absolute inset-0 bg-gradient-to-br from-stone-50 to-transparent rounded-lg opacity-50" />
-                <blockquote className="relative border-l-4 border-stone-900 pl-6 py-4">
-                  <p className="text-xl md:text-2xl font-serif italic text-stone-800 leading-relaxed">
-                    "{latestEpisode.highlightQuote}"
-                  </p>
-                </blockquote>
-              </div>
-            )}
-
-            {/* Episode Summary */}
-            <p className="text-lg text-stone-600 leading-relaxed mb-6 max-w-3xl">
-              {latestEpisode.summary}
-            </p>
-
-            {/* Sources Count */}
-            {latestEpisode.sources && latestEpisode.sources.length > 0 && (
-              <div className="flex items-center text-sm text-stone-500 mb-8">
-                <ExternalLink className="w-3 h-3 mr-1.5" />
-                {latestEpisode.sources.length} sources cited
-              </div>
-            )}
-
+            
             {/* CTA Button */}
             <Link href={`/episodes/${latestEpisode.id}`}>
               <Button 
                 size="lg"
-                className="bg-stone-900 hover:bg-stone-800 text-white font-medium px-6 py-3 transition-all duration-300 hover:shadow-lg hover:-translate-y-0.5"
+                className="bg-stone-900 hover:bg-stone-800 text-white font-medium px-6 py-3 transition-all duration-300 hover:shadow-xl hover:-translate-y-1"
               >
-                Read episode
-                <span className="ml-2 transition-transform group-hover:translate-x-1">→</span>
+                Read Episode →
               </Button>
             </Link>
-          </article>
+          </section>
         )}
 
-        {/* Divider */}
-        <div className="h-px bg-gradient-to-r from-transparent via-stone-200 to-transparent mb-12" />
-
-        {/* Upcoming Episode Preview */}
+        {/* Upcoming Episode Preview - Still centered for editorial feel */}
         {upcoming && upcoming.status === 'scheduled' && (
-          <section className="mb-16 animate-fade-in" style={{ animationDelay: '0.2s' }}>
+          <section className="max-w-3xl mx-auto px-8 py-12 text-center border-t border-stone-200">
             <h3 className="text-xs uppercase tracking-wider text-stone-500 font-medium mb-6">
               COMING {getDayOfWeek(upcoming.scheduledAt)}
             </h3>
             
             {upcoming.previewQuestions && upcoming.previewQuestions.length > 0 && (
-              <div className="space-y-4 mb-6">
+              <div className="space-y-4 mb-6 text-left max-w-2xl mx-auto">
                 {upcoming.previewQuestions.map((question, i) => (
                   <div key={i} className="flex items-start gap-3">
                     <span className="text-stone-400 mt-0.5">→</span>
@@ -230,85 +244,81 @@ export default function ProjectDetailPage() {
           </section>
         )}
 
-        {/* Previous Episodes */}
+        {/* Zone 2: Functional List - Previous Episodes */}
         {previousEpisodes.length > 0 && (
-          <>
-            <div className="h-px bg-gradient-to-r from-transparent via-stone-200 to-transparent mb-12" />
+          <section className="max-w-6xl mx-auto px-6 py-12 border-t border-stone-200">
+            <div className="flex items-center justify-between mb-8">
+              <h3 className="font-serif text-2xl md:text-3xl font-semibold text-stone-900">
+                Previous Episodes
+              </h3>
+            </div>
             
-            <section className="animate-fade-in" style={{ animationDelay: '0.4s' }}>
-              <div className="flex items-center justify-between mb-6">
-                <h3 className="text-xs uppercase tracking-wider text-stone-500 font-medium">
-                  PREVIOUS EPISODES
-                </h3>
-              </div>
-              
-              {/* Search Bar */}
-              <div className="relative mb-8">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-stone-400" />
-                <Input
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  placeholder="Search episodes..."
-                  className="pl-10 bg-white border-stone-200 focus:border-stone-400 transition-colors"
-                />
-              </div>
-              
-              {/* Episode List */}
-              {filteredPrevious.length === 0 ? (
-                <p className="text-sm text-stone-500">
-                  {searchQuery ? "No matches found." : "No previous episodes."}
-                </p>
-              ) : (
-                <div className="space-y-4">
-                  {filteredPrevious.map((episode) => (
-                    <Link
-                      key={episode.id}
-                      href={`/episodes/${episode.id}`}
-                      className="block"
-                    >
-                      <Card className="bg-white border-stone-200 hover:shadow-lg hover:-translate-y-0.5 transition-all duration-300 cursor-pointer group">
-                        <CardContent className="p-6">
-                          <div className="flex items-start justify-between">
-                            <div className="flex-1">
-                              <div className="flex items-center gap-2 mb-2">
-                                <Badge variant="secondary" className="bg-stone-100 text-stone-600 text-xs">
-                                  Episode {episode.sequence}
-                                </Badge>
-                                {isNew(episode) && (
-                                  <Badge className="bg-blue-100 text-blue-700 border-0 text-xs">NEW</Badge>
-                                )}
-                              </div>
-                              <h4 className="font-semibold text-stone-900 group-hover:text-stone-700 transition-colors mb-2">
-                                {episode.title}
-                              </h4>
-                              <p className="text-sm text-stone-600 line-clamp-2 mb-3">
-                                {episode.summary}
-                              </p>
-                              <div className="flex items-center gap-4 text-xs text-stone-500">
-                                <span>{formatDate(episode.publishedAt)}</span>
-                                <span>•</span>
-                                <span>{episode.readingMinutes} min read</span>
-                                {episode.sources && episode.sources.length > 0 && (
-                                  <>
-                                    <span>•</span>
-                                    <span className="flex items-center">
-                                      <ExternalLink className="w-3 h-3 mr-1" />
-                                      {episode.sources.length} sources
-                                    </span>
-                                  </>
-                                )}
-                              </div>
+            {/* Search Bar */}
+            <div className="relative mb-8 max-w-md">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-stone-400" />
+              <Input
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Search episodes..."
+                className="pl-10 bg-white border-stone-200 focus:border-stone-400 transition-colors"
+              />
+            </div>
+            
+            {/* Episode List with serif titles */}
+            {filteredPrevious.length === 0 ? (
+              <p className="text-base text-stone-500">
+                {searchQuery ? "No matches found." : "No previous episodes."}
+              </p>
+            ) : (
+              <div className="space-y-4">
+                {filteredPrevious.map((episode) => (
+                  <Link
+                    key={episode.id}
+                    href={`/episodes/${episode.id}`}
+                    className="block"
+                  >
+                    <Card className="bg-white border border-stone-200 hover:shadow-xl hover:-translate-y-1 transition-all duration-300 cursor-pointer group">
+                      <CardContent className="p-8">
+                        <div className="flex items-start justify-between">
+                          <div className="flex-1">
+                            <div className="flex items-center gap-3 mb-3">
+                              <span className="text-xs uppercase tracking-wider text-stone-500">
+                                Episode {episode.sequence}
+                              </span>
+                              {isNew(episode) && (
+                                <Badge className="bg-blue-100 text-blue-700 border-0 text-xs uppercase tracking-wider">NEW</Badge>
+                              )}
                             </div>
-                            <ChevronRight className="w-5 h-5 text-stone-400 group-hover:text-stone-600 transition-colors ml-4 flex-shrink-0" />
+                            <h4 className="font-serif text-2xl font-semibold text-stone-900 group-hover:text-stone-700 transition-colors mb-3">
+                              {episode.title}
+                            </h4>
+                            <p className="text-base text-stone-600 line-clamp-2 mb-4 leading-relaxed">
+                              {episode.summary}
+                            </p>
+                            <div className="flex items-center gap-4 text-xs uppercase tracking-wider text-stone-500">
+                              <span>{formatDate(episode.publishedAt)}</span>
+                              <span className="w-1 h-1 bg-stone-300 rounded-full" />
+                              <span>{episode.readingMinutes} min read</span>
+                              {episode.sources && episode.sources.length > 0 && (
+                                <>
+                                  <span className="w-1 h-1 bg-stone-300 rounded-full" />
+                                  <span className="flex items-center normal-case tracking-normal">
+                                    <ExternalLink className="w-3 h-3 mr-1" />
+                                    {episode.sources.length} sources
+                                  </span>
+                                </>
+                              )}
+                            </div>
                           </div>
-                        </CardContent>
-                      </Card>
-                    </Link>
-                  ))}
-                </div>
-              )}
-            </section>
-          </>
+                          <ChevronRight className="w-5 h-5 text-stone-400 group-hover:text-stone-600 transition-colors ml-4 flex-shrink-0" />
+                        </div>
+                      </CardContent>
+                    </Card>
+                  </Link>
+                ))}
+              </div>
+            )}
+          </section>
         )}
       </div>
     </div>

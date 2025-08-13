@@ -4,8 +4,8 @@
 **Date:** 2025-08-13  
 **Owner:** Product Team  
 **Related:** 
-- [Homepage Architecture ADR](./05-architecture-decisions/18-homepage-architecture.md)
-- [Projects Summary API](./05-architecture-decisions/08-home-summary-and-homepage.md)
+- [Homepage Architecture ADR](./18-homepage-architecture.md)
+- [Projects Summary API](../05-architecture-decisions/08-home-summary-and-homepage.md)
 
 ## Executive Summary
 

@@ -4,7 +4,7 @@
 **Date:** 2025-08-13
 **Owner:** Product Team
 **Related:** 
-- [Project Detail Architecture ADR](./05-architecture-decisions/19-project-detail-architecture.md)
+- [Project Detail Architecture ADR](./19-project-detail-architecture.md)
 - [Homepage PRD](./homepage-prd.md)
 
 ## Executive Summary

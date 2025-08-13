@@ -99,22 +99,18 @@ export default function ProjectsPage() {
   };
 
   return (
-    <div className="min-h-screen bg-stone-50">
-      {/* Sticky Header */}
-      <header className="sticky top-0 z-10 bg-white/90 backdrop-blur border-b border-stone-200">
-        <div className="max-w-6xl mx-auto px-6 py-4 flex items-center justify-between">
-          <h1 className="text-xl font-semibold">Projects</h1>
-          <Link href="/projects/new">
-            <Button className="bg-stone-900 hover:bg-stone-800 text-white">
-              New project
-            </Button>
-          </Link>
+    <div className="min-h-screen bg-white">
+      {/* Page Header */}
+      <header className="border-b border-stone-200">
+        <div className="max-w-6xl mx-auto px-6 py-12">
+          <h1 className="font-serif text-3xl md:text-4xl font-bold text-stone-900 mb-2">Your Projects</h1>
+          <p className="text-base text-stone-600">Strategic intelligence tailored to your future</p>
         </div>
       </header>
 
-      <div className="max-w-6xl mx-auto px-6 py-6 space-y-6">
+      <div className="max-w-6xl mx-auto px-6 py-8 space-y-8">
         {/* Toolbar */}
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex-1 flex items-center gap-3">
             <div className="relative w-full sm:w-80">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-stone-400" />
@@ -122,13 +118,13 @@ export default function ProjectsPage() {
                 placeholder="Search projects"
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
-                className="pl-9 border-stone-200 focus:border-stone-400"
+                className="pl-9 border-stone-200 focus:border-stone-400 bg-white"
               />
             </div>
             <select
               value={sort}
               onChange={(e) => setSort(e.target.value as SortKey)}
-              className="rounded-md border border-stone-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-stone-300"
+              className="rounded-md border border-stone-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-stone-300 bg-white"
             >
               <option value="lastPublished">Sort: Last published</option>
               <option value="nextEpisode">Sort: Next episode</option>
@@ -136,6 +132,12 @@ export default function ProjectsPage() {
             </select>
           </div>
           <div className="flex items-center gap-2">
+            <Link href="/projects/new">
+              <Button className="bg-stone-900 hover:bg-stone-800 text-white px-6">
+                New project
+              </Button>
+            </Link>
+            <div className="h-8 w-px bg-stone-200 mx-2" />
             {(['all', 'active', 'paused'] as StatusFilter[]).map((f) => (
               <button
                 key={f}
@@ -155,19 +157,24 @@ export default function ProjectsPage() {
 
         {/* Projects Grid */}
         {filtered.length === 0 ? (
-          <Card className="border-dashed border-stone-300 bg-white">
-            <CardContent className="flex flex-col items-center justify-center py-12">
-              <p className="text-stone-600 mb-2">No projects found</p>
-              {query && (
-                <button
-                  onClick={() => setQuery('')}
-                  className="text-sm text-stone-500 hover:text-stone-700 underline"
-                >
-                  Clear search
-                </button>
-              )}
-            </CardContent>
-          </Card>
+          <div className="text-center py-16">
+            <p className="font-serif text-2xl text-stone-900 mb-4">No projects found</p>
+            <p className="text-base text-stone-600 mb-6">Start exploring your strategic future</p>
+            {query ? (
+              <button
+                onClick={() => setQuery('')}
+                className="text-sm text-blue-600 hover:text-blue-700 underline"
+              >
+                Clear search
+              </button>
+            ) : (
+              <Link href="/projects/new">
+                <Button className="bg-stone-900 hover:bg-stone-800 text-white px-6 py-3">
+                  Create your first project
+                </Button>
+              </Link>
+            )}
+          </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
             {filtered.map((project) => {
@@ -179,7 +186,7 @@ export default function ProjectsPage() {
                   href={`/projects/${project.id}`}
                   className="group"
                 >
-                  <Card className="h-full bg-white border-stone-200 transition-all duration-300 hover:shadow-lg hover:-translate-y-0.5 cursor-pointer">
+                  <Card className="h-full bg-white border border-stone-200 transition-all duration-300 hover:shadow-xl hover:-translate-y-1 cursor-pointer">
                     <CardContent className="p-8">
                       {/* Project Avatar & Status */}
                       <div className="flex items-start justify-between mb-6">
@@ -201,8 +208,8 @@ export default function ProjectsPage() {
                       </div>
 
                       {/* Content */}
-                      <div className="space-y-4">
-                        <h3 className={`text-xl font-bold leading-tight line-clamp-2 ${
+                      <div className="space-y-3">
+                        <h3 className={`font-serif text-2xl font-semibold leading-tight line-clamp-2 ${
                           project.isPaused ? 'text-stone-700' : 'text-stone-900'
                         }`}>
                           {project.title}
@@ -215,51 +222,35 @@ export default function ProjectsPage() {
                       </div>
 
                       {/* Metadata */}
-                      <div className={`mt-6 pt-6 border-t space-y-2 ${
-                        project.isPaused ? 'border-stone-100' : 'border-stone-150'
+                      <div className={`mt-6 pt-6 border-t space-y-3 ${
+                        project.isPaused ? 'border-stone-100' : 'border-stone-200'
                       }`}>
-                        {/* Next Episode (Primary) */}
-                        <div className="flex items-center justify-between">
-                          <span className={`text-sm ${
-                            project.isPaused ? 'text-stone-400' : 'text-stone-500'
-                          }`}>
-                            Next episode
+                        <div className={`flex items-center gap-4 text-xs uppercase tracking-wider ${
+                          project.isPaused ? 'text-stone-400' : 'text-stone-500'
+                        }`}>
+                          <span>
+                            {stats.publishedEpisodes} episodes
                           </span>
-                          <span className={`text-sm font-medium ${
-                            project.isPaused ? 'text-stone-500' : 'text-stone-700'
-                          }`}>
-                            {project.isPaused ? "Paused" : formatDate(project.nextScheduledAt)}
+                          <span className="w-1 h-1 bg-stone-300 rounded-full" />
+                          <span>
+                            {project.cadenceType}
                           </span>
-                        </div>
-                        
-                        {/* Last Published (Secondary) */}
-                        {project.lastPublishedAt && (
-                          <div className="flex items-center justify-between">
-                            <span className={`text-sm ${
-                              project.isPaused ? 'text-stone-400' : 'text-stone-500'
-                            }`}>
-                              Last published
-                            </span>
-                            <span className={`text-sm ${
-                              project.isPaused ? 'text-stone-400' : 'text-stone-500'
-                            }`}>
-                              {formatDate(project.lastPublishedAt)}
-                            </span>
-                          </div>
-                        )}
-                        
-                        {/* Episodes Count */}
-                        <div className="flex items-center justify-between">
-                          <span className={`text-sm ${
-                            project.isPaused ? 'text-stone-400' : 'text-stone-500'
-                          }`}>
-                            Episodes
-                          </span>
-                          <span className={`text-sm font-medium ${
-                            project.isPaused ? 'text-stone-500' : 'text-stone-600'
-                          }`}>
-                            {stats.publishedEpisodes} published
-                          </span>
+                          {!project.isPaused && project.nextScheduledAt && (
+                            <>
+                              <span className="w-1 h-1 bg-stone-300 rounded-full" />
+                              <span className={`font-medium text-stone-700`}>
+                                Next: {formatDate(project.nextScheduledAt)}
+                              </span>
+                            </>
+                          )}
+                          {project.isPaused && (
+                            <>
+                              <span className="w-1 h-1 bg-stone-300 rounded-full" />
+                              <span className="text-stone-500">
+                                Paused
+                              </span>
+                            </>
+                          )}
                         </div>
                       </div>
                     </CardContent>
@@ -272,9 +263,9 @@ export default function ProjectsPage() {
 
         {/* Summary Footer */}
         {projects.length > 0 && (
-          <div className="mt-8 p-4 bg-white rounded-lg border border-stone-200">
+          <div className="mt-12 pt-8 border-t border-stone-200">
             <div className="flex items-center justify-between text-sm">
-              <span className="text-stone-600">
+              <span className="text-xs uppercase tracking-wider text-stone-500">
                 {projects.length} project{projects.length !== 1 ? 's' : ''} • 
                 {' '}{projects.filter(p => !p.isPaused).length} active
               </span>
