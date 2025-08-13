@@ -1,11 +1,18 @@
 // Mock data for UI scaffolding
 // This structure represents our final database schema
+// 
+// KEY DESIGN DECISIONS:
+// - Organizations from day 1 (even for single users) to avoid migration pain
+// - Projects belong to orgs, not users directly
+// - Episodes are denormalized with organizationId for query performance
+// - Token usage tracked at org level for billing
+// - Markdown storage for episodes (not complex blocks)
 
 export type User = {
   id: string;
   email: string;
   name: string;
-  clerkId: string;
+  clerkId: string; // Clerk's user_xxx ID for auth integration
   createdAt: Date;
   updatedAt: Date;
 };
@@ -14,10 +21,10 @@ export type OrganizationType = "PERSONAL" | "TEAM";
 
 export type Organization = {
   id: string;
-  name: string;
+  name: string; // Format: "Sarah's Workspace" for personal, actual name for teams
   type: OrganizationType;
   ownerId: string;
-  clerkOrgId: string | null;
+  clerkOrgId: string | null; // Only populated for TEAM orgs, null for PERSONAL
   createdAt: Date;
   updatedAt: Date;
 };
@@ -26,22 +33,23 @@ export type CadenceType = "WEEKLY" | "BIWEEKLY" | "MONTHLY";
 
 export type Project = {
   id: string;
-  organizationId: string;
-  title: string;
-  description: string;
-  shortSummary: string;
-  onboardingBrief: {
-    context: string;
-    focusAreas: string[];
+  organizationId: string; // Scoping to org enables future team features
+  title: string; // User-facing project name, shows in cards
+  description: string; // Longer description for context
+  shortSummary: string; // One-liner for quick scanning
+  onboardingBrief: { // Captures the conversational onboarding with Futura
+    context: string; // User's situation/role
+    focusAreas: string[]; // What they want to track
     preferences: {
-      tone: string;
-      speculationLevel: string;
+      tone: string; // provocative, balanced, conservative
+      speculationLevel: string; // high, moderate, low
     };
-    turnCount: number;
-  } | null;
+    turnCount: number; // How many conversation turns to generate brief
+  } | null; // Null if project created but not yet onboarded
   cadenceType: CadenceType;
-  nextScheduledAt: Date | null;
-  isPaused: boolean;
+  nextScheduledAt: Date | null; // When next episode will generate
+  lastPublishedAt: Date | null; // When last episode was published
+  isPaused: boolean; // User can pause episode generation
   createdAt: Date;
   updatedAt: Date;
 };
@@ -51,32 +59,36 @@ export type EpisodeStatus = "DRAFT" | "GENERATING" | "PUBLISHED" | "FAILED";
 export type Episode = {
   id: string;
   projectId: string;
-  organizationId: string; // Denormalized for query performance
-  sequence: number;
-  title: string;
-  summary: string;
-  highlightQuote?: string;
-  content: string; // Markdown
+  organizationId: string; // Denormalized for faster org-level queries
+  sequence: number; // Episode number within project (1, 2, 3...)
+  title: string; // Episode headline
+  summary: string; // One paragraph teaser
+  highlightQuote?: string; // Pull quote for engagement
+  content: string; // Full episode in Markdown (not blocks!)
   status: EpisodeStatus;
-  publishedAt: Date | null;
-  readingMinutes: number;
+  publishedAt: Date | null; // When it went live
+  readingMinutes: number; // Pre-calculated read time
   createdAt: Date;
   updatedAt: Date;
 };
 
 export type TokenUsage = {
   id: string;
-  organizationId: string;
-  projectId: string | null;
-  episodeId: string | null;
-  model: string;
+  organizationId: string; // Critical for billing at org level
+  projectId: string | null; // Which project triggered this usage
+  episodeId: string | null; // Which episode (null for onboarding conversations)
+  model: string; // gpt-4, gpt-4-turbo, claude-3-opus, etc.
   promptTokens: number;
   completionTokens: number;
-  totalCost: number; // In dollars
+  totalCost: number; // In dollars - MUST track for cost controls
   createdAt: Date;
 };
 
-// Mock data instances
+// ============================================
+// MOCK DATA INSTANCES
+// These represent realistic data for testing
+// ============================================
+
 export const mockUser: User = {
   id: "user_1",
   email: "sarah@designconsultancy.co.uk",
@@ -88,15 +100,16 @@ export const mockUser: User = {
 
 export const mockOrganization: Organization = {
   id: "org_1",
-  name: "Sarah's Workspace",
+  name: "Sarah's Workspace", // Auto-created on signup as personal workspace
   type: "PERSONAL",
   ownerId: "user_1",
-  clerkOrgId: null, // Personal orgs don't need Clerk org ID
+  clerkOrgId: null, // Personal orgs managed by our logic, not Clerk
   createdAt: new Date("2025-08-01"),
   updatedAt: new Date("2025-08-01"),
 };
 
 export const mockProjects: Project[] = [
+  // Active project with published episodes - shows full feature set
   {
     id: "proj_1",
     organizationId: "org_1",
@@ -119,10 +132,12 @@ export const mockProjects: Project[] = [
     },
     cadenceType: "WEEKLY",
     nextScheduledAt: new Date("2025-08-20"),
+    lastPublishedAt: new Date("2025-08-06"),
     isPaused: false,
     createdAt: new Date("2025-08-01"),
     updatedAt: new Date("2025-08-13"),
   },
+  // Paused project - user can pause/resume episode generation
   {
     id: "proj_2",
     organizationId: "org_1",
@@ -145,10 +160,12 @@ export const mockProjects: Project[] = [
     },
     cadenceType: "WEEKLY",
     nextScheduledAt: new Date("2025-08-21"),
+    lastPublishedAt: new Date("2025-07-22"),
     isPaused: true,
     createdAt: new Date("2025-07-15"),
     updatedAt: new Date("2025-08-10"),
   },
+  // New project without onboarding - shows empty state
   {
     id: "proj_3",
     organizationId: "org_1",
@@ -158,6 +175,7 @@ export const mockProjects: Project[] = [
     onboardingBrief: null, // Not yet onboarded
     cadenceType: "BIWEEKLY",
     nextScheduledAt: null,
+    lastPublishedAt: null,
     isPaused: false,
     createdAt: new Date("2025-08-13"),
     updatedAt: new Date("2025-08-13"),
@@ -292,7 +310,12 @@ export const mockTokenUsage: TokenUsage[] = [
   }
 ];
 
-// Helper functions
+// ============================================
+// HELPER FUNCTIONS
+// These simulate database queries
+// In production, these become tRPC procedures or server actions
+// ============================================
+
 export function getProjectsByOrg(orgId: string): Project[] {
   return mockProjects.filter(p => p.organizationId === orgId);
 }
