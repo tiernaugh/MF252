@@ -129,3 +129,65 @@ Creating comprehensive mock data that represents our final schema:
 3. Add Clerk authentication with org support
 4. Create API routes to replace mock data
 5. Connect real AI services (GPT-4/5 for conversations)
+
+---
+
+## Day 3 - Enhanced Episodes & Project Details
+
+### Episode Data Architecture
+- **Enhanced Episode type** with sources tracking, research prompts, and highlight quotes
+- **Markdown format with inline sources** - Using hyperlinks like `[Source Name](url)` for clickability
+- **Separated episode content** into mock-episodes.ts for better organization
+- **Rich content structure** while keeping simple markdown storage
+
+### Mock Data Improvements
+- Fixed logic: Active projects MUST have nextScheduledAt (paused proj_3 to fix)
+- Added comprehensive episodes with real-world content patterns
+- Included sources array for future analytics and credibility scoring
+- Added research prompts to guide next episode generation
+
+### Project Detail Page Built
+Created `/projects/[id]/page.tsx` with:
+- Project header with pause/resume controls
+- Episode list showing published and draft episodes
+- Status sidebar with project metrics
+- Project brief display (from onboarding conversation)
+- Source citations count on episode cards
+- Reading time estimates
+
+### Design Decisions
+- **Sources as hyperlinks**: Better UX than footnotes, immediate context
+- **Markdown over blocks**: Simpler storage, easier editing, portable
+- **Research prompts**: Maintain narrative continuity between episodes
+- **Highlight quotes**: Engagement and shareability
+
+### Data Model Validated
+The mock data structure successfully represents:
+- Organizations from day 1 (avoiding migration pain)
+- Projects with full lifecycle (active, paused, draft)
+- Episodes with sources and metadata
+- Token usage for billing
+
+### UI/UX Refinements
+- Projects page now sorts paused projects below active ones
+- Off-gray backgrounds (stone-50) for premium feel
+- Project avatars with initials
+- Consistent hover states with shadow and lift
+- Search and filter functionality working
+
+### What's Working Well
+- Mock data structure maps cleanly to UI needs
+- Markdown format preserves richness while staying simple
+- Source tracking enables future features (credibility, analytics)
+- Project detail page provides clear overview
+
+### Technical Debt to Address
+- Episode reader needs source display enhancement
+- No real-time episode generation status
+- Feedback collection not connected
+- Settings pages are placeholders
+
+### Deployment Status
+- All changes committed and pushed to GitHub
+- Vercel auto-deploying from main branch
+- UI fully functional with mock data

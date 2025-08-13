@@ -8,6 +8,8 @@
 // - Token usage tracked at org level for billing
 // - Markdown storage for episodes (not complex blocks)
 
+import { episode2Content, episode3Content } from "./mock-episodes";
+
 export type User = {
   id: string;
   email: string;
@@ -56,6 +58,13 @@ export type Project = {
 
 export type EpisodeStatus = "DRAFT" | "GENERATING" | "PUBLISHED" | "FAILED";
 
+export type Source = {
+  title: string; // Source name/publication
+  url: string; // Link to source (can be # for placeholder)
+  publicationDate?: string; // When source was published
+  excerpt?: string; // Key quote or finding from source
+};
+
 export type Episode = {
   id: string;
   projectId: string;
@@ -65,6 +74,8 @@ export type Episode = {
   summary: string; // One paragraph teaser
   highlightQuote?: string; // Pull quote for engagement
   content: string; // Full episode in Markdown (not blocks!)
+  sources?: Source[]; // Array of sources cited in episode
+  researchPrompt?: string; // Question/direction for next episode
   status: EpisodeStatus;
   publishedAt: Date | null; // When it went live
   readingMinutes: number; // Pre-calculated read time
@@ -165,7 +176,7 @@ export const mockProjects: Project[] = [
     createdAt: new Date("2025-07-15"),
     updatedAt: new Date("2025-08-10"),
   },
-  // New project without onboarding - shows empty state
+  // New project without onboarding - shows empty state but PAUSED (active must have schedule)
   {
     id: "proj_3",
     organizationId: "org_1",
@@ -174,9 +185,9 @@ export const mockProjects: Project[] = [
     shortSummary: "Sustainability in design",
     onboardingBrief: null, // Not yet onboarded
     cadenceType: "BIWEEKLY",
-    nextScheduledAt: null,
+    nextScheduledAt: null, // Can be null because project is paused
     lastPublishedAt: null,
-    isPaused: false,
+    isPaused: true, // Must be paused if no schedule
     createdAt: new Date("2025-08-13"),
     updatedAt: new Date("2025-08-13"),
   }
@@ -232,32 +243,128 @@ For your consultancy specifically, this suggests three immediate actions:
 The evidence suggests moving aggressively to claim the "compliant innovator" position before the market crystalizes. Your Edinburgh location, financial services focus, and size are perfectly aligned with this emerging opportunity.
 
 But the window is measured in months, not years.`,
+    sources: [
+      {
+        title: "MIT Work of the Future Initiative",
+        url: "https://workofthefuture.mit.edu",
+        publicationDate: "2025-07",
+        excerpt: "Smaller firms with deep regulatory knowledge implementing AI 3x faster"
+      },
+      {
+        title: "Financial Times - Big Four AI Report",
+        url: "https://ft.com",
+        publicationDate: "2025-07-15",
+        excerpt: "Internal documents reveal AI implementation paralysis"
+      },
+      {
+        title: "UK Financial Services Executive Survey",
+        url: "#",
+        publicationDate: "2025-06",
+        excerpt: "73% would pay 40% premium for compliance-first AI integration"
+      }
+    ],
+    researchPrompt: "How are boutique consultancies actually positioning their regulatory expertise as an AI differentiator?",
     status: "PUBLISHED",
     publishedAt: new Date("2025-08-06"),
     readingMinutes: 7,
     createdAt: new Date("2025-08-06"),
     updatedAt: new Date("2025-08-06"),
   },
+  // Episode 2: Deep dive on AI expectations (Published)
   {
     id: "ep_2",
     projectId: "proj_1",
     organizationId: "org_1",
     sequence: 2,
-    title: "Client Expectation Shifts",
-    summary: "New procurement language reveals changing client priorities in professional services",
-    content: `# Client Expectation Shifts
-
-The language in RFPs has changed. An analysis of 150 recent procurement documents from UK financial services reveals a fundamental shift in how clients think about consultancy partnerships...
-
-[Episode content continues...]`,
-    status: "DRAFT",
-    publishedAt: null,
+    title: "When Everyone Has AI, What Are Consultancies Actually For?",
+    summary: "The gap between AI access and AI strategy is creating unexpected opportunities",
+    highlightQuote: "Having ChatGPT doesn't automatically translate to strategic AI implementation",
+    content: episode2Content,
+    sources: [
+      {
+        title: "McKinsey State of AI 2025",
+        url: "https://mckinsey.com/ai-adoption",
+        publicationDate: "2025-07",
+        excerpt: "Employees using AI 3x more than executives realize"
+      },
+      {
+        title: "Accenture Consulting Report Q2 2025",
+        url: "https://accenture.com/consulting-trends",
+        publicationDate: "2025-06",
+        excerpt: "86% of buyers seek AI-enabled advisory, 89% expect AI in all services"
+      },
+      {
+        title: "Gartner AI Implementation Study",
+        url: "https://gartner.com/ai-failures",
+        publicationDate: "2025-07",
+        excerpt: "30% failure rate for AI proof-of-concept projects"
+      },
+      {
+        title: "Deloitte Tech Trends 2025",
+        url: "https://deloitte.com/tech-trends-2025",
+        publicationDate: "2025-01",
+        excerpt: "92% of executives boosting AI spending over next 3 years"
+      },
+      {
+        title: "IBM AI Outlook 2025",
+        url: "https://ibm.com/ai-agents",
+        publicationDate: "2025-01",
+        excerpt: "2025 is the year of the agent"
+      }
+    ],
+    researchPrompt: "How are regulated industries approaching AI adoption differently than tech companies?",
+    status: "PUBLISHED",
+    publishedAt: new Date("2025-08-13"),
     readingMinutes: 8,
     createdAt: new Date("2025-08-13"),
     updatedAt: new Date("2025-08-13"),
   },
+  // Episode 3: Client expectations shift (Draft)
   {
     id: "ep_3",
+    projectId: "proj_1",
+    organizationId: "org_1",
+    sequence: 3,
+    title: "The Great Client Expectation Shift",
+    summary: "What financial services clients are actually hiring design consultancies for in the AI era",
+    highlightQuote: "Clients want both AI efficiency savings and higher-value human problem-solving",
+    content: episode3Content,
+    sources: [
+      {
+        title: "Accenture Consulting Report Q2 2025",
+        url: "https://accenture.com/consulting-q2-2025",
+        publicationDate: "2025-06-15",
+        excerpt: "86% of buyers actively seek AI-enabled advisory; 89% expect AI in services"
+      },
+      {
+        title: "Gartner Procurement Analytics 2025",
+        url: "https://gartner.com/procurement-2025",
+        publicationDate: "2025-05-20",
+        excerpt: "Ethical AI services +55%, explainable AI +37% in RFP language"
+      },
+      {
+        title: "McKinsey State of AI 2025",
+        url: "https://mckinsey.com/ai-reckoning-2025",
+        publicationDate: "2025-04-30",
+        excerpt: "2025 as AI's reckoning moment - from hype to value delivery"
+      },
+      {
+        title: "Deloitte Consulting Evolution",
+        url: "https://deloitte.com/consulting-evolution",
+        publicationDate: "2025-01-18",
+        excerpt: "75% of consulting firms integrating AI workflows by 2025"
+      }
+    ],
+    researchPrompt: "How are your current clients talking about AI differently than they were six months ago?",
+    status: "DRAFT",
+    publishedAt: null,
+    readingMinutes: 9,
+    createdAt: new Date("2025-08-20"),
+    updatedAt: new Date("2025-08-20"),
+  },
+  // Episode for Remote Work project
+  {
+    id: "ep_4",
     projectId: "proj_2",
     organizationId: "org_1",
     sequence: 1,
@@ -265,7 +372,34 @@ The language in RFPs has changed. An analysis of 150 recent procurement document
     summary: "How distributed work is reshaping more than just where we work",
     content: `# The Great Unbundling of the Office
 
-The office was never just about work. It bundled together dozens of functions that are now being unbundled and reformed in surprising ways...`,
+The office was never just about work. It bundled together dozens of functions—social connection, mentorship, serendipitous encounters, cultural transmission, status signaling—that are now being unbundled and reformed in surprising ways.
+
+What's emerging isn't just "remote work." It's a complete reimagining of how professional life gets organized.
+
+## The Unbundling Pattern
+
+According to [Microsoft's Work Trend Index](https://microsoft.com/work-trends), 73% of employees want flexible remote work options to stay. But here's what's interesting: 67% also want more in-person collaboration. That's not contradiction—it's unbundling.
+
+People don't want the office or remote. They want specific elements of each, reassembled in new configurations.
+
+## What's Being Unbundled
+
+**Focus Work**: Moving to homes, coffee shops, [dedicated focus spaces](https://focusmate.com)
+**Collaboration**: Shifting to intentional gatherings, quarterly offsites, project sprints
+**Social Connection**: Rebuilding through virtual coffee chats, Slack communities, local coworking
+**Mentorship**: Transforming into structured programs, explicit rather than osmotic
+**Culture**: Becoming more documented, intentional, less reliant on physical presence
+
+The unbundling isn't clean. Some functions work better separated. Others lose something essential when pulled apart.`,
+    sources: [
+      {
+        title: "Microsoft Work Trend Index 2025",
+        url: "https://microsoft.com/work-trends",
+        publicationDate: "2025-03",
+        excerpt: "73% want flexible remote options, 67% want more in-person collaboration"
+      }
+    ],
+    researchPrompt: "Which unbundled elements of office life are companies struggling most to replicate remotely?",
     status: "PUBLISHED",
     publishedAt: new Date("2025-07-22"),
     readingMinutes: 6,

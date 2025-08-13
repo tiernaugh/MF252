@@ -149,7 +149,8 @@ Once we prove that, we can add everything else.
 - **Database**: Supabase (PostgreSQL)
 - **Auth**: Clerk
 - **Payments**: Stripe
-- **AI**: OpenAI GPT-5, Claude
+- **AI Orchestration**: n8n Cloud (handles Research, Writer, QA agents)
+- **AI Models**: OpenAI GPT-5 (conversations), Claude (episodes via n8n)
 - **Monitoring**: Sentry
 - **Analytics**: PostHog
 - **Rate Limiting**: Upstash
@@ -229,11 +230,28 @@ app/
 
 ### What NOT to Build (MVP Scope)
 - ❌ Chat interface for episodes
-- ❌ Vector embeddings
+- ❌ Vector embeddings (n8n handles via pgvector)
 - ❌ Highlight/annotation tools
 - ❌ Share features
 - ❌ Team collaboration
 - ❌ Multiple content block types
+- ❌ AI orchestration in app (handled by n8n)
+
+### n8n Integration Architecture
+```typescript
+// Episode Generation Flow:
+1. App creates DRAFT episode with nextScheduledAt
+2. Cron/trigger calls n8n webhook with episode ID
+3. n8n workflow:
+   - Research Agent: Gathers facts/citations
+   - Writer Agent: Creates blocks + citations
+   - QA/Guardrails: Validates output
+4. n8n calls back to app API with:
+   - Episode content (markdown)
+   - Sources array
+   - Token usage for billing
+5. App updates episode status to PUBLISHED/FAILED
+```
 
 ### API Security Patterns
 ```typescript
