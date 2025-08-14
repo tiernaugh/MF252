@@ -12,10 +12,13 @@ export default function NewProjectPage() {
   const router = useRouter();
   const [input, setInput] = useState("");
   const [showKeyboardHints, setShowKeyboardHints] = useState(false);
+  const [isTypewriterComplete, setIsTypewriterComplete] = useState(false);
+  const [isBriefLocked, setIsBriefLocked] = useState(false);
   
   const containerRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const previousBriefRef = useRef<string>('');
   
   const {
     messages,
@@ -33,6 +36,15 @@ export default function NewProjectPage() {
   useEffect(() => {
     reset();
   }, [reset]);
+  
+  // Reset typewriter state only when brief content actually changes
+  useEffect(() => {
+    const currentBrief = projectBrief?.brief || '';
+    if (currentBrief !== previousBriefRef.current && currentBrief !== '' && !isBriefLocked) {
+      setIsTypewriterComplete(false);
+      previousBriefRef.current = currentBrief;
+    }
+  }, [projectBrief?.brief, isBriefLocked]);
   
   // Auto-focus input
   useEffect(() => {
@@ -65,6 +77,12 @@ export default function NewProjectPage() {
     
     if (!input.trim() || isLoading) return;
     
+    // If brief was generated and user continues typing, lock it
+    if (phase === 'brief_generated' && !isBriefLocked) {
+      setIsBriefLocked(true);
+      setIsTypewriterComplete(false); // Reset for potential new content
+    }
+    
     // Store input value and clear immediately for better UX
     const message = input.trim();
     setInput("");
@@ -85,11 +103,6 @@ export default function NewProjectPage() {
     // In production, this would be saved to database
     // For demo, we'll just navigate
     router.push(`/projects/${mockProjects[0]?.id || newProjectId}`);
-  };
-  
-  const handleContinueShaping = async () => {
-    setInput(""); // Clear any existing input
-    await sendMessage("I'd like to shape this further");
   };
   
   const handleClose = () => {
@@ -126,8 +139,11 @@ export default function NewProjectPage() {
   
   const getPlaceholder = () => {
     if (messages.length === 1) return "What future would you like to explore?";
-    if (phase === 'brief_generated') {
-      return "Press Enter to confirm, or continue the conversation...";
+    if (phase === 'brief_generated' && !isBriefLocked) {
+      return "Continue shaping or press Enter to create project...";
+    }
+    if (phase === 'brief_generated' && isBriefLocked) {
+      return "Brief created. Click Create Project to start research";
     }
     if (isLoading) return "";
     return "Type your response...";
@@ -223,41 +239,63 @@ export default function NewProjectPage() {
             
             {/* Error display */}
             {error && (
-              <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">
-                {error}
+              <div className="animate-fade-in">
+                <div className="flex justify-center py-4">
+                  <div className="w-1 h-1 bg-red-300 rounded-full" />
+                </div>
+                <div className="p-4 bg-red-50 border border-red-200 rounded-lg">
+                  <div className="flex items-start gap-3">
+                    <svg className="w-5 h-5 text-red-600 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                    </svg>
+                    <div>
+                      <p className="text-sm font-medium text-red-800">{error}</p>
+                      {error.includes('try again') && (
+                        <button
+                          onClick={() => {
+                            setError(null);
+                            // Retry last message if exists
+                            if (messages.length > 1) {
+                              const lastUserMessage = [...messages].reverse().find(m => m.role === 'user');
+                              if (lastUserMessage) {
+                                sendMessage(lastUserMessage.content);
+                              }
+                            }
+                          }}
+                          className="mt-2 text-xs text-red-600 hover:text-red-800 underline"
+                        >
+                          Retry
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                </div>
               </div>
             )}
             
-            {/* Brief Canvas */}
+            {/* Brief Canvas - keep visible even after conversation continues */}
             {projectBrief && phase === 'brief_generated' && (
               <>
-                {console.log('Rendering BriefCanvas with:', { 
-                  title: projectBrief.title, 
-                  brief: projectBrief.brief,
-                  fullObject: projectBrief 
-                })}
                 <BriefCanvas
                   title={projectBrief.title}
                   brief={projectBrief.brief || (projectBrief as any).content || 'Brief content not found'}
                   onSave={saveBrief}
-                  showTypewriter={true}
+                  showTypewriter={!isBriefLocked}
+                  isLocked={isBriefLocked}
+                  onTypewriterComplete={() => setIsTypewriterComplete(true)}
                 />
                 
-                {/* Action buttons */}
-                <div className="mt-8 flex gap-3 justify-center">
-                  <button
-                    onClick={handleContinueShaping}
-                    className="px-4 py-2 text-sm text-stone-600 hover:text-stone-900 transition-colors"
-                  >
-                    Continue Shaping
-                  </button>
-                  <button
-                    onClick={handleCreateProject}
-                    className="px-4 py-2 text-sm bg-stone-900 text-white rounded-lg hover:bg-stone-800 transition-colors"
-                  >
-                    Start Research →
-                  </button>
-                </div>
+                {/* Action button - only show when typewriter is complete and brief not locked */}
+                {isTypewriterComplete && !isBriefLocked && (
+                  <div className="mt-8 flex justify-center animate-fade-in">
+                    <button
+                      onClick={handleCreateProject}
+                      className="px-6 py-3 text-sm bg-stone-900 text-white rounded-lg hover:bg-stone-800 transition-colors"
+                    >
+                      Create Project
+                    </button>
+                  </div>
+                )}
               </>
             )}
             

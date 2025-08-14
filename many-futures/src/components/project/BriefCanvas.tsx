@@ -7,13 +7,17 @@ interface BriefCanvasProps {
   brief: string;
   onSave: (title: string, brief: string) => void;
   showTypewriter?: boolean;
+  isLocked?: boolean;
+  onTypewriterComplete?: () => void;
 }
 
 export function BriefCanvas({ 
   title: initialTitle, 
   brief: initialBrief, 
   onSave,
-  showTypewriter = true 
+  showTypewriter = true,
+  isLocked = false,
+  onTypewriterComplete
 }: BriefCanvasProps) {
   const [isEditing, setIsEditing] = useState(false);
   const [title, setTitle] = useState(initialTitle);
@@ -38,19 +42,21 @@ export function BriefCanvas({
         currentIndex += 2; // Type 2 characters at a time
       } else {
         clearInterval(typeInterval);
+        // Notify parent when typewriter completes
+        if (onTypewriterComplete) {
+          onTypewriterComplete();
+        }
       }
     }, 30);
     
     return () => clearInterval(typeInterval);
-  }, [initialBrief, showTypewriter]);
+  }, [initialBrief, showTypewriter, onTypewriterComplete]);
 
   const handleEdit = () => {
+    // Don't allow editing if locked or typewriter is still running
+    if (isLocked || (showTypewriter && typewriterProgress < 100)) return;
+    
     setIsEditing(true);
-    // Set full text if typewriter is still running
-    if (showTypewriter && typewriterProgress < 100) {
-      setDisplayedBrief(brief);
-      setTypewriterProgress(100);
-    }
     
     setTimeout(() => {
       // Focus on brief content
@@ -102,12 +108,15 @@ export function BriefCanvas({
           relative p-8 rounded-lg border transition-all duration-300 group
           ${isEditing 
             ? 'bg-white border-stone-400 shadow-lg' 
-            : 'bg-gradient-to-br from-stone-50 to-white border-stone-200 hover:shadow-md cursor-pointer'
+            : isLocked
+            ? 'bg-stone-50 border-stone-200'
+            : isTypewriterComplete
+            ? 'bg-gradient-to-br from-stone-50 to-white border-stone-200 hover:shadow-md cursor-pointer'
+            : 'bg-gradient-to-br from-stone-50 to-white border-stone-200'
           }
         `}
         onClick={() => {
-          console.log('Brief canvas clicked:', { isEditing, showTypewriter, typewriterProgress });
-          if (!isEditing) {
+          if (!isEditing && !isLocked && isTypewriterComplete) {
             handleEdit();
           }
         }}
@@ -144,7 +153,7 @@ export function BriefCanvas({
         </div>
         
         {/* Edit hint */}
-        {!isEditing && (
+        {!isEditing && !isLocked && isTypewriterComplete && (
           <div className="absolute bottom-2 right-2 text-xs text-stone-400 opacity-0 group-hover:opacity-100 transition-opacity">
             Click to edit
           </div>
@@ -158,8 +167,8 @@ export function BriefCanvas({
         )}
       </div>
       
-      {/* Action hints (only show when not editing) */}
-      {!isEditing && (
+      {/* Action hints (only show when not editing, not locked, and typewriter complete) */}
+      {!isEditing && !isLocked && isTypewriterComplete && (
         <div className="mt-6 text-center text-sm text-stone-400 animate-fade-in">
           <span className="hidden md:inline">Click to edit</span>
           <span className="md:hidden">Tap to edit</span>

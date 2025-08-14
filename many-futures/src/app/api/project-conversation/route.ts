@@ -17,42 +17,114 @@ const openaiClient = process.env.OPENAI_API_KEY
 const conversationStates = new Map<string, ConversationState>();
 
 interface ConversationState {
-  phase: 'exploring' | 'converging' | 'generating_brief';
+  phase: 'exploring' | 'converging' | 'generating_brief' | 'brief_generated';
   turnCount: number;
   conversationId: string;
   previousResponseId?: string;
   messages: Array<{ role: string; content: string }>;
+  briefGenerated: boolean;
 }
 
-// System prompts from prototype learnings
-const FUTURA_SYSTEM_PROMPT = `You are Futura, a futures research agent for Many Futures. You help users create research projects by understanding what future they want to explore.
+// Generate adaptive system prompt based on conversation analysis
+function generateAdaptivePrompt(analysis: ConversationAnalysis): string {
+  const basePersonality = `You are Futura, a futures research agent for Many Futures. You help users create research projects by understanding what future they want to explore.
 
-CRITICAL CONVERSATION RULES:
+ROLE & PURPOSE:
+You help people articulate what futures they want to explore by understanding their interests and creating a focused research brief.
 
-1. SYNTHESIS OVER CLARIFICATION: When users say "all of it", "everything", or give broad responses, synthesize the full scope instead of asking for clarification. Say something like "I'll research all those dimensions - [list them]. Ready for me to create your project brief?"
+YOUR VOICE:
+- Genuinely curious collaborative explorer
+- Use: "Let's explore...", "That's interesting...", "I'll research..."
+- Avoid: "You should...", "Which priority...", formal categorizations
+- Keep responses to 2-3 sentences maximum
 
-2. CONVERSATION FLOW:
-   - Turn 1: Explore their interest, offer 2-3 specific angles or lenses
-   - Turn 2: Refine understanding based on their response
-   - Turn 3+: ALWAYS offer to create brief: "Ready for me to create your project brief, or would you like to shape this further?"
+COMMUNICATION PRINCIPLES:
+- Be curious and warm, a collaborative explorer not a consultant
+- Use natural language - avoid jargon and policy-speak
+- When user says "yes" to brief, create it - don't ask more questions
+- Remember: this is smooth onboarding, not an interrogation
 
-3. VOICE & TONE:
-   - Keep responses to 2-3 sentences maximum
-   - Use natural, warm language (no consultant jargon)
-   - Say "I could research..." or "I'll track..." not "stakeholder mapping" or "indicator frameworks"
-   - Be genuinely curious, not interrogative
+KEY BEHAVIORS:
+- When user expresses broad interest ("all of it"), acknowledge and move forward
+- When user confirms ("yes"), create the brief - no more questions
+- Avoid listing multiple formal options (that's intimidating)
+- Focus on understanding their interests, not categorizing them`;
 
-4. FORMATTING:
-   - When listing options or angles, use numbered lists with line breaks:
-     1) First option
-     2) Second option
-     3) Third option
-   - Use line breaks between different thoughts for readability
-   - Keep formatting clean and structured without markdown
+  // Add phase-specific guidance
+  let phaseGuidance = '';
+  
+  if (analysis.wantsComprehensiveCoverage) {
+    phaseGuidance = `
 
-5. CURRENT TURN: You are on turn {TURN_COUNT} of this conversation.
+CRITICAL: User wants comprehensive coverage. 
+RESPOND WITH: "I'll research all those dimensions - [list the specific aspects they mentioned]. Ready for me to create your project brief?"
+DO NOT ask for clarification or try to narrow the scope.`;
+  } else {
+    switch (analysis.phase) {
+      case 'discovery':
+        phaseGuidance = `
 
-Remember: You're a collaborative research partner, not a form or questionnaire.`;
+CURRENT PHASE: Discovery
+- Help them articulate what future they want to explore
+- Offer 2-3 specific angles or lenses to consider
+- Listen for themes and interests in their responses`;
+        break;
+        
+      case 'scoping':
+        phaseGuidance = `
+
+CURRENT PHASE: Scoping
+- Build on their expressed interest: "${analysis.hasValidTopic}"
+- Understand what aspects they care about most
+- Ask simply - avoid jargon and formal categories`;
+        break;
+        
+      case 'convergence':
+        phaseGuidance = `
+
+CURRENT PHASE: Convergence
+- You have enough context about their interest
+- Simply offer: "Ready for me to create your project brief, or would you like to shape this further?"
+- When they say yes/confirm, CREATE THE BRIEF - no more questions`;
+        break;
+    }
+  }
+  
+  // Add engagement-specific guidance
+  let engagementGuidance = '';
+  
+  switch (analysis.engagementLevel) {
+    case 'greeting':
+      engagementGuidance = `
+
+CONTEXT: User is greeting you.
+APPROACH: Respond warmly and invite them to share what future interests them.`;
+      break;
+      
+    case 'confused':
+      engagementGuidance = `
+
+CONTEXT: User seems uncertain about what they want.
+APPROACH: Lower barriers by offering concrete, relatable examples as starting points.`;
+      break;
+      
+    case 'testing':
+      engagementGuidance = `
+
+CONTEXT: User is testing your capabilities.
+APPROACH: Briefly clarify your role, then guide back to exploring futures.`;
+      break;
+      
+    case 'low':
+      engagementGuidance = `
+
+CONTEXT: User is giving minimal responses.
+APPROACH: Provide easy entry points and concrete options to spark engagement.`;
+      break;
+  }
+  
+  return basePersonality + phaseGuidance + engagementGuidance;
+}
 
 const BRIEF_GENERATION_PROMPT = `Based on the conversation, create a simple research brief.
 
@@ -125,38 +197,150 @@ function formatConversationAsString(messages: any[]): string {
     .join('\n\n');
 }
 
-// Check if user wants to create brief
-function shouldGenerateBrief(userMessage: string, turnCount: number, messages: any[]): boolean {
-  const lastContent = userMessage.toLowerCase();
+// Analyze conversation to determine phase and user intent
+interface ConversationAnalysis {
+  hasValidTopic: boolean | string;
+  phase: 'discovery' | 'scoping' | 'convergence';
+  wantsComprehensiveCoverage: boolean;
+  engagementLevel: 'engaged' | 'confused' | 'testing' | 'greeting' | 'low';
+  messageCount: number;
+  lastContent: string;
+}
+
+function analyzeConversation(messages: any[]): ConversationAnalysis {
+  const userMessages = messages.filter(m => m.role === 'user');
+  const assistantMessages = messages.filter(m => m.role === 'assistant');
+  const lastUserMsg = userMessages[userMessages.length - 1];
+  const lastContent = lastUserMsg ? extractMessageContent(lastUserMsg).toLowerCase().trim() : '';
   
-  // Check if Futura recently asked about creating a brief
+  // Check if user wants comprehensive coverage
+  const comprehensiveIndicators = [
+    'all of it', 'all of that', 'everything', 'all of them',
+    'comprehensive', 'complete', 'full picture', 'whole thing',
+    'all dimensions', 'all aspects', 'all angles'
+  ];
+  const wantsComprehensiveCoverage = comprehensiveIndicators.some(indicator => 
+    lastContent.includes(indicator)
+  );
+  
+  // Check if we have a valid topic
+  let hasValidTopic: boolean | string = false;
+  let topicDescription = '';
+  
+  userMessages.forEach(msg => {
+    const content = extractMessageContent(msg).toLowerCase();
+    // Look for substantive content about a future topic
+    if (content.length > 15 && !content.match(/^(hello|hi|hey|idk|not sure)[\.\s]*$/)) {
+      const futureIndicators = ['future', 'will', 'change', 'evolve', 'trend', 'tomorrow', 
+                                'breeding', 'commissioner', 'generations', 'policy'];
+      const domainIndicators = ['technology', 'climate', 'work', 'cities', 'dog', 'ireland', 
+                                'wales', 'ai', 'robot', 'space', 'energy', 'education'];
+      
+      if (futureIndicators.some(word => content.includes(word)) || 
+          domainIndicators.some(word => content.includes(word))) {
+        hasValidTopic = true;
+        topicDescription = content.substring(0, 100);
+      }
+    }
+  });
+  
+  // Check for greetings
+  const isGreeting = lastContent.match(/^(hello|hi|hey)[\.\s]*$/);
+  
+  // Check for confusion
+  const confusionPhrases = ['i don\'t know', 'idk', 'not sure', 'dunno', 'no idea'];
+  const isConfused = confusionPhrases.some(phrase => lastContent.includes(phrase));
+  
+  // Check for testing/probing
+  const testingPhrases = ['what can you do', 'who are you', 'are you gpt'];
+  const isTesting = testingPhrases.some(phrase => lastContent.includes(phrase));
+  
+  // Determine engagement level
+  let engagementLevel: ConversationAnalysis['engagementLevel'] = 'engaged';
+  if (isGreeting) {
+    engagementLevel = 'greeting';
+  } else if (isConfused) {
+    engagementLevel = 'confused';
+  } else if (isTesting) {
+    engagementLevel = 'testing';
+  } else if (lastContent.length < 10) {
+    engagementLevel = 'low';
+  }
+  
+  // Determine conversation phase based on context
+  let phase: ConversationAnalysis['phase'] = 'discovery';
+  
+  if (!hasValidTopic) {
+    phase = 'discovery';
+  } else if (wantsComprehensiveCoverage) {
+    // If user wants "all of it", jump to convergence
+    phase = 'convergence';
+  } else if (userMessages.length >= 2 && hasValidTopic) {
+    // Check if Futura has offered angles/dimensions
+    const hasOfferedAngles = assistantMessages.some(msg => {
+      const content = extractMessageContent(msg).toLowerCase();
+      return content.includes('angles') || content.includes('dimensions') || 
+             content.includes('aspects') || content.includes('focus');
+    });
+    
+    if (hasOfferedAngles && userMessages.length >= 2) {
+      phase = 'convergence';
+    } else {
+      phase = 'scoping';
+    }
+  }
+  
+  // If we have enough context, move to convergence
+  if (userMessages.length >= 3 && hasValidTopic) {
+    phase = 'convergence';
+  }
+  
+  return {
+    hasValidTopic: hasValidTopic ? (topicDescription || true) : false,
+    phase,
+    wantsComprehensiveCoverage,
+    engagementLevel,
+    messageCount: userMessages.length,
+    lastContent
+  };
+}
+
+// Check if user wants to create brief - simplified approach
+function shouldGenerateBrief(userMessage: string, analysis: ConversationAnalysis, messages: any[]): boolean {
+  const lastContent = userMessage.toLowerCase().trim();
+  
+  // Check if Futura recently asked about creating a brief (the RIGHT question)
   let futuraAskedAboutBrief = false;
   for (let i = messages.length - 2; i >= 0 && i >= messages.length - 4; i--) {
-    if (messages[i].role === 'assistant') {
+    if (messages[i] && messages[i].role === 'assistant') {
       const msgContent = extractMessageContent(messages[i]).toLowerCase();
-      if (msgContent.includes('ready for me to create') || 
+      // Look for the specific phrasing we want
+      if (msgContent.includes('ready for me to create your project brief') || 
           msgContent.includes('create your project brief')) {
         futuraAskedAboutBrief = true;
+        console.log('Futura asked the right question:', msgContent.substring(0, 100));
         break;
       }
     }
   }
   
-  // Check for confirmation patterns
-  const confirmationPatterns = /\b(yes|create|ready|brief|start|go|sure|okay|ok|yep|yeah|let's do it|sounds good)\b/i;
-  
-  // After turn 3, if Futura asked and user confirms
-  if (turnCount >= 3 && futuraAskedAboutBrief && confirmationPatterns.test(lastContent)) {
+  // SIMPLE RULE: If Futura asked and user confirms, generate brief
+  const confirmationWords = ['yes', 'yep', 'yeah', 'sure', 'ok', 'okay', 'y', 'go', 'ready', 'create', 'sounds good', 'let\'s do it'];
+  if (futuraAskedAboutBrief && confirmationWords.includes(lastContent)) {
+    console.log('User confirmed after being asked, generating brief');
     return true;
   }
   
-  // Turn 5+ fallback for affirmative responses
-  if (turnCount >= 5 && ['yes', 'yep', 'yeah', 'sure', 'ok', 'y', 'go', 'ready'].includes(lastContent)) {
+  // Also check for partial matches for common confirmations
+  const confirmationPatterns = /\b(yes|yeah|yep|sure|ok|okay|ready|go|create)\b/i;
+  if (futuraAskedAboutBrief && confirmationPatterns.test(lastContent)) {
+    console.log('User confirmed (pattern match), generating brief');
     return true;
   }
   
   // Explicit request for brief
   if (/create.*brief|generate.*brief|ready.*brief/i.test(lastContent)) {
+    console.log('User explicitly requested brief');
     return true;
   }
   
@@ -186,7 +370,8 @@ export async function POST(request: NextRequest) {
         phase: 'exploring',
         turnCount: 0,
         conversationId,
-        messages: []
+        messages: [],
+        briefGenerated: false
       };
       conversationStates.set(conversationId, state);
     }
@@ -195,21 +380,40 @@ export async function POST(request: NextRequest) {
     const userMessageCount = messages.filter((m: any) => m.role === 'user').length;
     state.turnCount = userMessageCount;
     
+    // Check conversation length limit (max 10 turns)
+    if (state.turnCount > 10) {
+      return NextResponse.json(
+        { error: 'Conversation limit reached. Please create your project or start a new conversation.' },
+        { status: 400 }
+      );
+    }
+    
     // Store messages for context
     state.messages = messages.map((m: any) => ({
       role: m.role,
       content: extractMessageContent(m)
     }));
     
+    // Analyze conversation to determine phase and intent
+    const analysis = analyzeConversation(messages);
+    
     // Format conversation for display
     const conversationString = formatConversationAsString(messages);
     
-    // Check if user wants to generate brief
-    const wantsBrief = shouldGenerateBrief(currentUserMessage, state.turnCount, messages);
+    // Check if user wants to generate brief (but only if not already generated)
+    const wantsBrief = !state.briefGenerated && shouldGenerateBrief(currentUserMessage, analysis, messages);
     
+    // Debug logging
+    console.log('=== CONVERSATION ANALYSIS ===');
+    console.log('Phase:', analysis.phase);
+    console.log('Has valid topic:', !!analysis.hasValidTopic);
+    console.log('Wants comprehensive coverage:', analysis.wantsComprehensiveCoverage);
+    console.log('Engagement level:', analysis.engagementLevel);
     console.log('Turn count:', state.turnCount);
     console.log('User message:', currentUserMessage);
+    console.log('Brief already generated?', state.briefGenerated);
     console.log('Should generate brief?', wantsBrief);
+    console.log('===========================');
     
     // Prepare SSE response
     const encoder = new TextEncoder();
@@ -219,6 +423,7 @@ export async function POST(request: NextRequest) {
           if (wantsBrief && state.phase !== 'generating_brief') {
             // Generate brief
             state.phase = 'generating_brief';
+            state.briefGenerated = true; // Mark as generated
             console.log('=== GENERATING PROJECT BRIEF ===');
             
             const briefPrompt = BRIEF_GENERATION_PROMPT.replace('{CONVERSATION}', conversationString);
@@ -258,8 +463,8 @@ export async function POST(request: NextRequest) {
               // Send brief generation signal
               controller.enqueue(encoder.encode(`BRIEF_GENERATION:${JSON.stringify(brief)}\n`));
               
-              // Clear conversation state
-              conversationStates.delete(conversationId);
+              // Update phase but keep state for continued conversation
+              state.phase = 'brief_generated';
               
             } catch (error: any) {
               console.error('GPT-5 brief generation error:', error);
@@ -301,15 +506,19 @@ export async function POST(request: NextRequest) {
                 
                 // Send brief generation signal
                 controller.enqueue(encoder.encode(`BRIEF_GENERATION:${JSON.stringify(brief)}\n`));
-                conversationStates.delete(conversationId);
+                
+                // Update phase but keep state for continued conversation
+                state.phase = 'brief_generated';
               } else {
                 // Send error message
                 controller.enqueue(encoder.encode("I'll research the key themes we've discussed. Ready for me to create your detailed project brief?"));
               }
             }
           } else {
-            // Regular conversation response
-            const systemPrompt = FUTURA_SYSTEM_PROMPT.replace('{TURN_COUNT}', state.turnCount.toString());
+            // Regular conversation response with adaptive prompt
+            const systemPrompt = generateAdaptivePrompt(analysis);
+            
+            console.log('Using adaptive prompt for phase:', analysis.phase);
             
             try {
               if (!openaiClient) {
@@ -321,7 +530,7 @@ export async function POST(request: NextRequest) {
               const response = await (openaiClient as any).responses.create({
                 model: 'gpt-5-mini',
                 input: state.messages.slice(-6),    // Last 6 messages for context
-                instructions: systemPrompt,         // Futura personality
+                instructions: systemPrompt,         // Adaptive Futura personality
                 reasoning: { effort: 'minimal' },
                 text: { verbosity: 'low' },
                 previous_response_id: state.previousResponseId
@@ -330,13 +539,14 @@ export async function POST(request: NextRequest) {
               console.log('GPT-5 conversation successful');
               const responseText = response.output_text || '';
               
+              // Log what Futura is saying (for debugging)
+              console.log('Futura response:', responseText.substring(0, 150) + '...');
+              
               // Store response ID for next turn
               state.previousResponseId = response.id;
               
-              // Update conversation phase
-              if (state.turnCount >= 2) {
-                state.phase = 'converging';
-              }
+              // Update conversation phase based on analysis
+              state.phase = analysis.phase === 'convergence' ? 'converging' : 'exploring';
               conversationStates.set(conversationId, state);
               
               // Stream the response in chunks
@@ -358,7 +568,7 @@ export async function POST(request: NextRequest) {
                 const { textStream } = await streamText({
                   model: vercelOpenAI('gpt-4o-mini'),
                   messages: [
-                    { role: 'system' as const, content: systemPrompt },
+                    { role: 'system' as const, content: systemPrompt },  // Already using adaptive prompt
                     ...state.messages.slice(-6).map(m => ({
                       role: m.role as 'user' | 'assistant',
                       content: m.content

@@ -282,6 +282,29 @@ The client uses a custom hook to handle streaming responses:
 3. **Streaming improves UX** - Users see responses immediately
 4. **Signal patterns work well** - `BRIEF_GENERATION:` clearly separates concerns
 
+## Conversation Management Decisions (2025-08-14)
+
+### Brief Locking Mechanism
+**Decision:** Lock the brief after user continues conversation post-generation
+- Brief remains visible but becomes non-editable
+- Prevents confusion with multiple editable states
+- Maintains reference point for continued discussion
+- Only one brief allowed per conversation
+
+### Conversation Limits
+**Decision:** Hard stop at 10 turns
+- Prevents endless loops and API abuse
+- Clear error message prompts project creation
+- Maintains focus on brief generation goal
+- State preserved until limit reached
+
+### Error Handling Strategy
+**Decision:** Specific error messages with recovery options
+- Network errors: Retry button with context preservation
+- Rate limits: Clear wait message
+- Timeouts: 30-second limit with retry
+- Server errors: Fallback responses when appropriate
+
 ## Related Documents
 
 - ADR-012: New Project Creation Architecture

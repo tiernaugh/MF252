@@ -80,6 +80,13 @@ export function useProjectConversation(): UseProjectConversationReturn {
         content: msg.content
       }));
       
+      // Set timeout (30 seconds)
+      const timeoutId = setTimeout(() => {
+        if (abortControllerRef.current) {
+          abortControllerRef.current.abort();
+        }
+      }, 30000);
+      
       const response = await fetch('/api/project-conversation', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -90,8 +97,21 @@ export function useProjectConversation(): UseProjectConversationReturn {
         signal: abortControllerRef.current.signal
       });
       
+      // Clear timeout on successful response
+      clearTimeout(timeoutId);
+      
+      // Handle different error statuses
       if (!response.ok) {
-        throw new Error('Failed to get response');
+        if (response.status === 429) {
+          throw new Error('Too many requests. Please wait a moment and try again.');
+        } else if (response.status === 400) {
+          const errorData = await response.json();
+          throw new Error(errorData.error || 'Invalid request');
+        } else if (response.status >= 500) {
+          throw new Error('Our servers are experiencing issues. Please try again in a moment.');
+        } else {
+          throw new Error('Failed to connect to Futura. Please check your connection and try again.');
+        }
       }
       
       // Handle SSE streaming
@@ -163,22 +183,33 @@ export function useProjectConversation(): UseProjectConversationReturn {
       
     } catch (err: any) {
       if (err.name === 'AbortError') {
-        console.log('Request was aborted');
-        return;
+        // Check if it was a timeout
+        if (abortControllerRef.current?.signal.reason === 'timeout') {
+          setError('Request timed out. Please try again.');
+        } else {
+          console.log('Request was aborted by user');
+          return;
+        }
+      } else if (err.message) {
+        // Use the specific error message we set
+        setError(err.message);
+      } else {
+        // Generic error
+        console.error('Conversation error:', err);
+        setError('Something went wrong. Please try again.');
       }
       
-      console.error('Conversation error:', err);
-      setError('Failed to connect to Futura. Please try again.');
-      
-      // Fallback response
-      const fallbackMessage: Message = {
-        id: `msg-${Date.now() + 1}`,
-        role: 'assistant',
-        content: getFallbackResponse(turnCount),
-        timestamp: new Date()
-      };
-      
-      setMessages(prev => [...prev, fallbackMessage]);
+      // Only add fallback message for non-critical errors
+      if (err.name !== 'AbortError' && !err.message?.includes('limit reached')) {
+        const fallbackMessage: Message = {
+          id: `msg-${Date.now() + 1}`,
+          role: 'assistant',
+          content: getFallbackResponse(turnCount),
+          timestamp: new Date()
+        };
+        
+        setMessages(prev => [...prev, fallbackMessage]);
+      }
     } finally {
       setIsLoading(false);
       abortControllerRef.current = null;

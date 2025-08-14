@@ -78,6 +78,10 @@ Users need to articulate what futures they want to explore but may:
 - **Repetitive inputs** - Pattern detection and gentle redirection
 - **Hostile/trolling** - Professional response without engagement
 - **Testing/probing** - Brief acknowledgment, redirect to purpose
+- **Long conversations** - Hard stop at 10 turns with clear message
+- **Multiple brief attempts** - Only one brief per conversation allowed
+- **Network failures** - Specific error messages with retry option
+- **API timeouts** - 30-second timeout with appropriate message
 
 ## Voice Requirements
 
@@ -184,6 +188,22 @@ When Futura generates the brief, it should:
 - Simple structure: Title + Natural language brief
 - Show subtle edit affordances on hover
 - Save automatically on blur
+
+### Brief States
+1. **During Generation**: 
+   - Typewriter effect shows content appearing
+   - No buttons visible during animation
+   - Edit hints hidden
+
+2. **Generated & Editable**:
+   - "Create Project" button appears after typewriter completes
+   - Click anywhere on brief to edit
+   - Hover shows edit hints
+
+3. **Locked (after continuation)**:
+   - Brief remains visible but non-editable
+   - No hover effects or edit hints
+   - Serves as reference for continued conversation
 
 ### Brief Structure
 ```
@@ -351,6 +371,35 @@ The production implementation uses a hybrid approach:
 2. **Direct OpenAI SDK**: Better control over GPT-5 specific features
 3. **SSE over WebSockets**: Simpler, works with Next.js edge runtime
 4. **Signal Pattern**: `BRIEF_GENERATION:` clearly separates concerns
+
+## Error Handling
+
+### Error States
+1. **Network Errors**:
+   - "Failed to connect to Futura. Please check your connection and try again."
+   - Show retry button for recoverable errors
+   
+2. **Rate Limiting**:
+   - "Too many requests. Please wait a moment and try again."
+   - Prevent spam/abuse
+   
+3. **Server Errors**:
+   - "Our servers are experiencing issues. Please try again in a moment."
+   - Graceful degradation with fallback responses
+   
+4. **Timeout**:
+   - "Request timed out. Please try again."
+   - 30-second timeout on all API calls
+   
+5. **Conversation Limit**:
+   - "Conversation limit reached. Please create your project or start a new conversation."
+   - Hard stop at 10 turns
+
+### Error Display
+- Red-tinted alert box with icon
+- Clear, user-friendly messages
+- Retry button where appropriate
+- Maintains conversation context
 
 ## Future Enhancements
 
