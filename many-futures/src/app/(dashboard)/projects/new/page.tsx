@@ -46,12 +46,14 @@ export default function NewProjectPage() {
     }
   }, [projectBrief?.brief, isBriefLocked]);
   
-  // Auto-focus input
+  // Auto-focus input (but not during typewriter animation)
   useEffect(() => {
     if (phase !== 'brief_generated' && !isLoading && inputRef.current) {
+      // Don't focus if typewriter is running
+      if (projectBrief && !isTypewriterComplete) return;
       inputRef.current.focus();
     }
-  }, [phase, isLoading, messages]);
+  }, [phase, isLoading, messages, projectBrief, isTypewriterComplete]);
   
   // Shift from center to top as conversation grows
   useEffect(() => {
@@ -299,18 +301,20 @@ export default function NewProjectPage() {
               </>
             )}
             
-            {/* Input field - always visible */}
-            <form onSubmit={handleSubmit} className="mt-8">
-              <input
-                ref={inputRef}
-                type="text"
-                value={input}
-                onChange={(e) => setInput(e.target.value)}
-                placeholder={getPlaceholder()}
-                className="w-full bg-transparent border-b border-stone-200 pb-2 outline-none font-sans text-lg md:text-xl text-stone-700 placeholder-stone-400 focus:border-stone-400 transition-colors"
-                disabled={isLoading}
-              />
-            </form>
+            {/* Input field - hide during typewriter animation */}
+            {(!projectBrief || phase !== 'brief_generated' || isTypewriterComplete) && (
+              <form onSubmit={handleSubmit} className="mt-8">
+                <input
+                  ref={inputRef}
+                  type="text"
+                  value={input}
+                  onChange={(e) => setInput(e.target.value)}
+                  placeholder={getPlaceholder()}
+                  className="w-full bg-transparent border-b border-stone-200 pb-2 outline-none font-sans text-lg md:text-xl text-stone-700 placeholder-stone-400 focus:border-stone-400 transition-colors"
+                  disabled={isLoading}
+                />
+              </form>
+            )}
             
             {/* Invisible div for scroll targeting */}
             <div ref={messagesEndRef} />
