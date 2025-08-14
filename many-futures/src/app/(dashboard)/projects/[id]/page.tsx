@@ -68,26 +68,38 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
     );
   }
 
-  const formatDate = (date: Date | null) => {
+  // Dynamic date formatting (Today, Yesterday, X days ago)
+  const formatDynamicDate = (date: Date | null): string => {
     if (!date) return "Not scheduled";
-    return date.toLocaleDateString('en-GB', { 
-      day: 'numeric', 
-      month: 'short',
-      year: 'numeric'
-    });
+    
+    const now = new Date();
+    const dateToFormat = new Date(date);
+    
+    // Reset times to midnight for accurate day comparison
+    now.setHours(0, 0, 0, 0);
+    dateToFormat.setHours(0, 0, 0, 0);
+    
+    const diffTime = now.getTime() - dateToFormat.getTime();
+    const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+    
+    if (diffDays === 0) {
+      return "Today";
+    } else if (diffDays === 1) {
+      return "Yesterday";
+    } else if (diffDays > 1 && diffDays <= 7) {
+      return `${diffDays} days ago`;
+    } else {
+      // For older dates, show the full date
+      return date.toLocaleDateString('en-GB', { 
+        day: 'numeric', 
+        month: 'short',
+        year: 'numeric'
+      });
+    }
   };
 
   const getDayOfWeek = (date: Date) => {
     return date.toLocaleDateString('en-GB', { weekday: 'long' }).toUpperCase();
-  };
-
-  const getProjectInitials = (title: string) => {
-    return title
-      .split(' ')
-      .map(word => word[0])
-      .join('')
-      .substring(0, 2)
-      .toUpperCase();
   };
 
   // Calculate time until influence deadline
@@ -188,6 +200,8 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
             
             {/* Metadata */}
             <div className="flex items-center justify-center gap-4 text-sm text-stone-500 mb-10">
+              <span>{formatDynamicDate(latestEpisode.publishedAt)}</span>
+              <span className="w-1 h-1 bg-stone-300 rounded-full" />
               <span>{latestEpisode.readingMinutes} min read</span>
               {latestEpisode.sources && latestEpisode.sources.length > 0 && (
                 <>
@@ -296,7 +310,7 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
                               {episode.summary}
                             </p>
                             <div className="flex items-center gap-4 text-xs uppercase tracking-wider text-stone-500">
-                              <span>{formatDate(episode.publishedAt)}</span>
+                              <span>{formatDynamicDate(episode.publishedAt)}</span>
                               <span className="w-1 h-1 bg-stone-300 rounded-full" />
                               <span>{episode.readingMinutes} min read</span>
                               {episode.sources && episode.sources.length > 0 && (

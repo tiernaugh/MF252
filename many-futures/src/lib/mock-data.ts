@@ -498,7 +498,14 @@ export function getProjectsByOrg(orgId: string): Project[] {
 }
 
 export function getEpisodesByProject(projectId: string): Episode[] {
-  return mockEpisodes.filter(e => e.projectId === projectId);
+  return mockEpisodes
+    .filter(e => e.projectId === projectId)
+    .sort((a, b) => {
+      // Sort by publishedAt date, newest first
+      const dateA = a.publishedAt?.getTime() ?? 0;
+      const dateB = b.publishedAt?.getTime() ?? 0;
+      return dateB - dateA;
+    });
 }
 
 export function getPublishedEpisodes(orgId: string): Episode[] {
