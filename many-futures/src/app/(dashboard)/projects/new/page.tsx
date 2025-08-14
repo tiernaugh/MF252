@@ -23,7 +23,7 @@ const getFuturaResponse = (turnCount: number, userMessage: string): string => {
     "Perfect! I have everything I need to start researching for you. Let me create your project brief..."
   ];
   
-  return responses[Math.min(turnCount, responses.length - 1)] || responses[responses.length - 1];
+  return responses[Math.min(turnCount, responses.length - 1)] ?? responses[responses.length - 1]!;
 };
 
 const generateBrief = (messages: Message[]): string => {
