@@ -24,7 +24,7 @@ Get 5 paying customers for AI-generated strategic intelligence episodes at £29/
 - ✅ Database schema (complete, no changes needed)
 - ✅ Security implementation (RLS, audit logs)
 - ✅ Conversational UI for project creation
-- ✅ next-forge foundation
+
 
 ### What We Defer (Feature Flags OFF)
 - ❌ Chat interface (validate need first)

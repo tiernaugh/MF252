@@ -14,6 +14,7 @@ export default function NewProjectPage() {
   const [showKeyboardHints, setShowKeyboardHints] = useState(false);
   const [isTypewriterComplete, setIsTypewriterComplete] = useState(false);
   const [isBriefLocked, setIsBriefLocked] = useState(false);
+  const [hasShownTypewriter, setHasShownTypewriter] = useState(false);
   
   const containerRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -37,14 +38,27 @@ export default function NewProjectPage() {
     reset();
   }, [reset]);
   
-  // Reset typewriter state only when brief content actually changes
+  // Reset typewriter state when a NEW brief arrives (not edits)
   useEffect(() => {
     const currentBrief = projectBrief?.brief || '';
-    if (currentBrief !== previousBriefRef.current && currentBrief !== '' && !isBriefLocked) {
-      setIsTypewriterComplete(false);
+    
+    // Check if this is a genuinely new brief (not an edit)
+    // New briefs come from the server, edits come from saveBrief
+    if (currentBrief !== previousBriefRef.current && currentBrief !== '') {
+      // If the brief was locked (user continued conversation) and now we have a different brief,
+      // it's a new generation, not an edit
+      if (isBriefLocked && currentBrief !== previousBriefRef.current) {
+        // New brief after conversation continued - reset everything
+        setIsBriefLocked(false);
+        setHasShownTypewriter(false);
+        setIsTypewriterComplete(false);
+      } else if (!hasShownTypewriter && !isBriefLocked) {
+        // First brief or unlocked brief - show typewriter
+        setIsTypewriterComplete(false);
+      }
       previousBriefRef.current = currentBrief;
     }
-  }, [projectBrief?.brief, isBriefLocked]);
+  }, [projectBrief?.brief, isBriefLocked, hasShownTypewriter]);
   
   // Auto-focus input (but not during typewriter animation)
   useEffect(() => {
@@ -282,9 +296,12 @@ export default function NewProjectPage() {
                   title={projectBrief.title}
                   brief={projectBrief.brief || (projectBrief as any).content || 'Brief content not found'}
                   onSave={saveBrief}
-                  showTypewriter={!isBriefLocked}
+                  showTypewriter={!hasShownTypewriter && !isBriefLocked}
                   isLocked={isBriefLocked}
-                  onTypewriterComplete={() => setIsTypewriterComplete(true)}
+                  onTypewriterComplete={() => {
+                    setIsTypewriterComplete(true);
+                    setHasShownTypewriter(true);
+                  }}
                 />
                 
                 {/* Action button - only show when typewriter is complete and brief not locked */}

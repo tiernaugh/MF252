@@ -400,8 +400,9 @@ export async function POST(request: NextRequest) {
     // Format conversation for display
     const conversationString = formatConversationAsString(messages);
     
-    // Check if user wants to generate brief (but only if not already generated)
-    const wantsBrief = !state.briefGenerated && shouldGenerateBrief(currentUserMessage, analysis, messages);
+    // Check if user wants to generate brief
+    // Allow multiple briefs - user might continue conversation and want another
+    const wantsBrief = shouldGenerateBrief(currentUserMessage, analysis, messages);
     
     // Debug logging
     console.log('=== CONVERSATION ANALYSIS ===');
@@ -421,10 +422,11 @@ export async function POST(request: NextRequest) {
       async start(controller) {
         try {
           if (wantsBrief && state.phase !== 'generating_brief') {
-            // Generate brief
+            // Generate brief (could be first or subsequent)
             state.phase = 'generating_brief';
-            state.briefGenerated = true; // Mark as generated
+            state.briefGenerated = true; // Mark as generated (but doesn't prevent future generation)
             console.log('=== GENERATING PROJECT BRIEF ===');
+            console.log('Brief number:', state.briefGenerated ? 'subsequent' : 'first');
             
             const briefPrompt = BRIEF_GENERATION_PROMPT.replace('{CONVERSATION}', conversationString);
             
@@ -520,6 +522,12 @@ export async function POST(request: NextRequest) {
             
             console.log('Using adaptive prompt for phase:', analysis.phase);
             
+            // If we were in brief_generated phase and user is continuing, reset to exploring
+            if (state.phase === 'brief_generated') {
+              state.phase = 'exploring';
+              console.log('User continuing after brief, resetting phase to exploring');
+            }
+            
             try {
               if (!openaiClient) {
                 throw new Error('OpenAI API not configured');
@@ -546,7 +554,10 @@ export async function POST(request: NextRequest) {
               state.previousResponseId = response.id;
               
               // Update conversation phase based on analysis
-              state.phase = analysis.phase === 'convergence' ? 'converging' : 'exploring';
+              // Don't override if we just reset from brief_generated
+              if (state.phase !== 'exploring' || analysis.phase === 'convergence') {
+                state.phase = analysis.phase === 'convergence' ? 'converging' : 'exploring';
+              }
               conversationStates.set(conversationId, state);
               
               // Stream the response in chunks
@@ -582,9 +593,10 @@ export async function POST(request: NextRequest) {
                   controller.enqueue(encoder.encode(chunk));
                 }
                 
-                // Update conversation phase
-                if (state.turnCount >= 2) {
-                  state.phase = 'converging';
+                // Update conversation phase based on analysis
+                // Don't override if we just reset from brief_generated
+                if (state.phase !== 'exploring' || analysis.phase === 'convergence') {
+                  state.phase = analysis.phase === 'convergence' ? 'converging' : 'exploring';
                 }
                 conversationStates.set(conversationId, state);
               } else {
