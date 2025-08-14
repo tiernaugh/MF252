@@ -102,15 +102,6 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
     return date.toLocaleDateString('en-GB', { weekday: 'long' }).toUpperCase();
   };
 
-  // Calculate time until influence deadline
-  const getInfluenceTime = (deadline?: Date) => {
-    if (!deadline) return null;
-    const now = new Date();
-    const hours = Math.floor((deadline.getTime() - now.getTime()) / (1000 * 60 * 60));
-    if (hours <= 0) return null;
-    return `${hours} hours`;
-  };
-
   // Separate and filter episodes
   const publishedEpisodes = episodes.filter(e => e.status === "PUBLISHED");
   const latestEpisode = publishedEpisodes[0];
@@ -240,7 +231,7 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
             </h3>
             
             {upcoming.previewQuestions && upcoming.previewQuestions.length > 0 && (
-              <div className="space-y-4 mb-6 text-left max-w-2xl mx-auto">
+              <div className="space-y-4 text-left max-w-2xl mx-auto">
                 {upcoming.previewQuestions.map((question, i) => (
                   <div key={i} className="flex items-start gap-3">
                     <span className="text-stone-400 mt-0.5">→</span>
@@ -248,12 +239,6 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
                   </div>
                 ))}
               </div>
-            )}
-            
-            {upcoming.influenceDeadline && getInfluenceTime(upcoming.influenceDeadline) && (
-              <p className="text-sm text-stone-500">
-                You can influence this episode for another {getInfluenceTime(upcoming.influenceDeadline)}
-              </p>
             )}
           </section>
         )}
