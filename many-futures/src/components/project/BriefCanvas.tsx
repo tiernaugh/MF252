@@ -36,11 +36,14 @@ export function BriefCanvas({
     const fullText = initialBrief;
     
     const typeInterval = setInterval(() => {
-      if (currentIndex <= fullText.length) {
+      if (currentIndex < fullText.length) {
         setDisplayedBrief(fullText.slice(0, currentIndex));
         setTypewriterProgress((currentIndex / fullText.length) * 100);
         currentIndex += 2; // Type 2 characters at a time
       } else {
+        // Ensure we display the complete text
+        setDisplayedBrief(fullText);
+        setTypewriterProgress(100);
         clearInterval(typeInterval);
         // Notify parent when typewriter completes
         if (onTypewriterComplete) {
