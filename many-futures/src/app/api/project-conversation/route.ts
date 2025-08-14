@@ -1,8 +1,13 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import OpenAI from 'openai';
+import { openai as vercelOpenAI } from '@ai-sdk/openai';
+import { streamText } from 'ai';
 
-// Initialize OpenAI client (optional for build)
-const openai = process.env.OPENAI_API_KEY 
+// Allow streaming responses up to 30 seconds
+export const maxDuration = 30;
+
+// Initialize OpenAI client for GPT-5 Responses API
+const openaiClient = process.env.OPENAI_API_KEY 
   ? new OpenAI({
       apiKey: process.env.OPENAI_API_KEY,
     })
@@ -37,21 +42,56 @@ CRITICAL CONVERSATION RULES:
    - Say "I could research..." or "I'll track..." not "stakeholder mapping" or "indicator frameworks"
    - Be genuinely curious, not interrogative
 
-4. CURRENT TURN: You are on turn {TURN_COUNT} of this conversation.
+4. FORMATTING:
+   - When listing options or angles, use numbered lists with line breaks:
+     1) First option
+     2) Second option
+     3) Third option
+   - Use line breaks between different thoughts for readability
+   - Keep formatting clean and structured without markdown
+
+5. CURRENT TURN: You are on turn {TURN_COUNT} of this conversation.
 
 Remember: You're a collaborative research partner, not a form or questionnaire.`;
 
-const BRIEF_GENERATION_PROMPT = `Based on this conversation, generate a project brief.
+const BRIEF_GENERATION_PROMPT = `Based on the conversation, create a simple research brief.
 
-CONVERSATION:
+Format as clean, structured text with proper line spacing:
+
+[Clear, simple title]
+
+
+WHAT I'LL RESEARCH
+
+[One paragraph starting with "I'll research..." - what you'll explore and why it matters. Keep it conversational and curious.]
+
+
+KEY QUESTIONS
+
+1. [First exploratory question]
+2. [Second exploratory question] 
+3. [Third exploratory question]
+4. [Fourth exploratory question if relevant]
+
+
+HOW I'LL EXPLORE THIS
+
+[One short paragraph about your approach - looking across different domains, tracking changes, exploring possibilities.]
+
+IMPORTANT:
+- Use only plain text with line breaks, NO markdown syntax
+- Keep the whole brief under 200 words
+- Write as Futura in first person
+- Be curious and exploratory, not formal
+- NO project management language (timelines, deliverables, stakeholders, budgets)
+- NO business consulting speak
+- Focus on the exploration, not outputs
+- Use double line breaks between sections for proper spacing
+
+Conversation:
 {CONVERSATION}
 
-Generate a brief with this EXACT format:
-BRIEF_GENERATION_SIGNAL
-Title: [Concise, engaging title]
-Brief: I'll research [main topic and approach]. I'll track [specific things you'll monitor], examining [key angles]. My focus will be on [core questions or tensions].
-
-Keep the brief to 2-3 sentences. Be specific about what you'll research based on the conversation.`;
+Generate the brief:`;
 
 // Helper to extract message content (handles Vercel AI SDK format)
 function extractMessageContent(msg: any): string {
@@ -86,23 +126,44 @@ function formatConversationAsString(messages: any[]): string {
 }
 
 // Check if user wants to create brief
-function shouldGenerateBrief(userMessage: string, turnCount: number): boolean {
-  const confirmationPatterns = /\b(yes|create|ready|brief|start|go|sure|okay|ok|let's do it|sounds good)\b/i;
+function shouldGenerateBrief(userMessage: string, turnCount: number, messages: any[]): boolean {
+  const lastContent = userMessage.toLowerCase();
   
-  // After turn 3, be more aggressive about generating brief
-  if (turnCount >= 3 && confirmationPatterns.test(userMessage)) {
+  // Check if Futura recently asked about creating a brief
+  let futuraAskedAboutBrief = false;
+  for (let i = messages.length - 2; i >= 0 && i >= messages.length - 4; i--) {
+    if (messages[i].role === 'assistant') {
+      const msgContent = extractMessageContent(messages[i]).toLowerCase();
+      if (msgContent.includes('ready for me to create') || 
+          msgContent.includes('create your project brief')) {
+        futuraAskedAboutBrief = true;
+        break;
+      }
+    }
+  }
+  
+  // Check for confirmation patterns
+  const confirmationPatterns = /\b(yes|create|ready|brief|start|go|sure|okay|ok|yep|yeah|let's do it|sounds good)\b/i;
+  
+  // After turn 3, if Futura asked and user confirms
+  if (turnCount >= 3 && futuraAskedAboutBrief && confirmationPatterns.test(lastContent)) {
+    return true;
+  }
+  
+  // Turn 5+ fallback for affirmative responses
+  if (turnCount >= 5 && ['yes', 'yep', 'yeah', 'sure', 'ok', 'y', 'go', 'ready'].includes(lastContent)) {
     return true;
   }
   
   // Explicit request for brief
-  if (/create.*brief|generate.*brief|ready.*brief/i.test(userMessage)) {
+  if (/create.*brief|generate.*brief|ready.*brief/i.test(lastContent)) {
     return true;
   }
   
   return false;
 }
 
-export async function POST(request: Request) {
+export async function POST(request: NextRequest) {
   try {
     const { messages, conversationId = 'default' } = await request.json();
     
@@ -112,6 +173,8 @@ export async function POST(request: Request) {
         { status: 400 }
       );
     }
+    
+    console.log('Received messages:', messages.length);
     
     // Extract current user message
     const currentUserMessage = extractMessageContent(messages[messages.length - 1]);
@@ -138,106 +201,215 @@ export async function POST(request: Request) {
       content: extractMessageContent(m)
     }));
     
+    // Format conversation for display
+    const conversationString = formatConversationAsString(messages);
+    
     // Check if user wants to generate brief
-    const wantsBrief = shouldGenerateBrief(currentUserMessage, state.turnCount);
+    const wantsBrief = shouldGenerateBrief(currentUserMessage, state.turnCount, messages);
     
-    if (wantsBrief && state.phase !== 'generating_brief') {
-      // Generate brief
-      state.phase = 'generating_brief';
-      
-      const conversationString = formatConversationAsString(messages);
-      const briefPrompt = BRIEF_GENERATION_PROMPT.replace('{CONVERSATION}', conversationString);
-      
-      try {
-        if (!openai) {
-          throw new Error('OpenAI API not configured');
+    console.log('Turn count:', state.turnCount);
+    console.log('User message:', currentUserMessage);
+    console.log('Should generate brief?', wantsBrief);
+    
+    // Prepare SSE response
+    const encoder = new TextEncoder();
+    const stream = new ReadableStream({
+      async start(controller) {
+        try {
+          if (wantsBrief && state.phase !== 'generating_brief') {
+            // Generate brief
+            state.phase = 'generating_brief';
+            console.log('=== GENERATING PROJECT BRIEF ===');
+            
+            const briefPrompt = BRIEF_GENERATION_PROMPT.replace('{CONVERSATION}', conversationString);
+            
+            try {
+              if (!openaiClient) {
+                throw new Error('OpenAI API not configured');
+              }
+              
+              // Try GPT-5 Responses API for brief generation
+              console.log('Attempting GPT-5 brief generation...');
+              const response = await (openaiClient as any).responses.create({
+                model: 'gpt-5-mini',
+                input: state.messages,           // The conversation messages
+                instructions: briefPrompt,       // The brief generation template
+                reasoning: { effort: 'low' },
+                text: { verbosity: 'medium' },
+                previous_response_id: state.previousResponseId
+              });
+              
+              console.log('GPT-5 brief generation successful');
+              const briefText = response.output_text || '';
+              
+              // Parse the brief - extract content after title
+              const titleMatch = briefText.match(/^#\s+(.+)$/m);
+              const hashIndex = briefText.indexOf('#');
+              const contentStart = hashIndex > -1 ? briefText.indexOf('\n', hashIndex) : -1;
+              const briefContent = contentStart > -1 ? briefText.slice(contentStart).trim() : briefText;
+              
+              const brief = {
+                title: titleMatch ? titleMatch[1]?.trim() ?? 'Future Research Project' : 'Future Research Project',
+                brief: briefContent  // Use 'brief' property consistently
+              };
+              
+              console.log('Generated brief:', brief);
+              
+              // Send brief generation signal
+              controller.enqueue(encoder.encode(`BRIEF_GENERATION:${JSON.stringify(brief)}\n`));
+              
+              // Clear conversation state
+              conversationStates.delete(conversationId);
+              
+            } catch (error: any) {
+              console.error('GPT-5 brief generation error:', error);
+              
+              // Fallback to GPT-4o-mini for brief generation
+              if (error.message?.includes('responses') || error.status === 404 || !openaiClient) {
+                console.log('Falling back to GPT-4o-mini for brief generation');
+                
+                const { textStream } = await streamText({
+                  model: vercelOpenAI('gpt-4o-mini'),
+                  messages: [
+                    { role: 'system' as const, content: briefPrompt },
+                    ...state.messages.map(m => ({
+                      role: m.role as 'user' | 'assistant',
+                      content: m.content
+                    }))
+                  ],
+                  temperature: 0.7,
+                });
+                
+                // Collect the full response for brief parsing
+                let briefText = '';
+                for await (const chunk of textStream) {
+                  briefText += chunk;
+                }
+                
+                // Parse the brief - extract content after title  
+                const titleMatch = briefText.match(/^#\s+(.+)$/m);
+                const hashIndex = briefText.indexOf('#');
+                const contentStart = hashIndex > -1 ? briefText.indexOf('\n', hashIndex) : -1;
+                const briefContent = contentStart > -1 ? briefText.slice(contentStart).trim() : briefText;
+                
+                const brief = {
+                  title: titleMatch ? titleMatch[1]?.trim() ?? 'Future Research Project' : 'Future Research Project',
+                  brief: briefContent  // Use 'brief' property consistently
+                };
+                
+                console.log('GPT-4 fallback brief:', brief);
+                
+                // Send brief generation signal
+                controller.enqueue(encoder.encode(`BRIEF_GENERATION:${JSON.stringify(brief)}\n`));
+                conversationStates.delete(conversationId);
+              } else {
+                // Send error message
+                controller.enqueue(encoder.encode("I'll research the key themes we've discussed. Ready for me to create your detailed project brief?"));
+              }
+            }
+          } else {
+            // Regular conversation response
+            const systemPrompt = FUTURA_SYSTEM_PROMPT.replace('{TURN_COUNT}', state.turnCount.toString());
+            
+            try {
+              if (!openaiClient) {
+                throw new Error('OpenAI API not configured');
+              }
+              
+              // Try GPT-5 Responses API first
+              console.log('Attempting GPT-5 conversation...');
+              const response = await (openaiClient as any).responses.create({
+                model: 'gpt-5-mini',
+                input: state.messages.slice(-6),    // Last 6 messages for context
+                instructions: systemPrompt,         // Futura personality
+                reasoning: { effort: 'minimal' },
+                text: { verbosity: 'low' },
+                previous_response_id: state.previousResponseId
+              });
+              
+              console.log('GPT-5 conversation successful');
+              const responseText = response.output_text || '';
+              
+              // Store response ID for next turn
+              state.previousResponseId = response.id;
+              
+              // Update conversation phase
+              if (state.turnCount >= 2) {
+                state.phase = 'converging';
+              }
+              conversationStates.set(conversationId, state);
+              
+              // Stream the response in chunks
+              const chunkSize = 20;
+              for (let i = 0; i < responseText.length; i += chunkSize) {
+                const chunk = responseText.slice(i, i + chunkSize);
+                controller.enqueue(encoder.encode(chunk));
+                // Add small delay to simulate streaming
+                await new Promise(resolve => setTimeout(resolve, 10));
+              }
+              
+            } catch (error: any) {
+              console.error('GPT-5 conversation error:', error);
+              
+              // Fallback to GPT-4o-mini via Vercel AI SDK
+              if (error.message?.includes('responses') || error.status === 404 || !openaiClient) {
+                console.log('Falling back to GPT-4o-mini for conversation');
+                
+                const { textStream } = await streamText({
+                  model: vercelOpenAI('gpt-4o-mini'),
+                  messages: [
+                    { role: 'system' as const, content: systemPrompt },
+                    ...state.messages.slice(-6).map(m => ({
+                      role: m.role as 'user' | 'assistant',
+                      content: m.content
+                    }))
+                  ],
+                  temperature: 0.8,
+                });
+                
+                // Stream the response
+                for await (const chunk of textStream) {
+                  controller.enqueue(encoder.encode(chunk));
+                }
+                
+                // Update conversation phase
+                if (state.turnCount >= 2) {
+                  state.phase = 'converging';
+                }
+                conversationStates.set(conversationId, state);
+              } else {
+                // Send fallback response
+                const fallbackResponses = [
+                  "That's fascinating! Tell me more about your role and what aspects interest you most.",
+                  "I understand. What specific dimensions should I focus on - technological, social, or policy changes?",
+                  "I have enough context to start researching. Ready for me to create your project brief?"
+                ];
+                
+                const fallbackMessage = fallbackResponses[Math.min(state.turnCount - 1, 2)] || fallbackResponses[2];
+                controller.enqueue(encoder.encode(fallbackMessage));
+              }
+            }
+          }
+          
+          // End the stream
+          controller.enqueue(encoder.encode('\n'));
+          controller.close();
+          
+        } catch (error) {
+          console.error('Stream error:', error);
+          controller.error(error);
         }
-        
-        // Use GPT-5 Responses API for brief generation
-        const response = await openai.chat.completions.create({
-          model: 'gpt-4o-mini', // Fallback until GPT-5 is available
-          messages: [
-            { role: 'system', content: briefPrompt },
-            { role: 'user', content: 'Generate the project brief based on our conversation.' }
-          ],
-          temperature: 0.7,
-          max_tokens: 300
-        });
-        
-        const briefContent = response.choices[0]?.message?.content || '';
-        
-        // Return the brief with special signal
-        return NextResponse.json({
-          message: briefContent,
-          phase: 'brief_generated'
-        });
-        
-      } catch (error) {
-        console.error('Brief generation error:', error);
-        // Fallback response
-        return NextResponse.json({
-          message: "I'll research the key themes we've discussed. Ready for me to create your detailed project brief?",
-          phase: state.phase
-        });
       }
-    }
+    });
     
-    // Regular conversation response
-    try {
-      if (!openai) {
-        throw new Error('OpenAI API not configured');
-      }
-      
-      // Prepare system prompt with turn count
-      const systemPrompt = FUTURA_SYSTEM_PROMPT.replace('{TURN_COUNT}', state.turnCount.toString());
-      
-      // Format messages for API
-      const apiMessages = [
-        { role: 'system' as const, content: systemPrompt },
-        ...messages.slice(-6).map((m: any) => ({ // Keep last 6 messages for context
-          role: m.role as 'user' | 'assistant',
-          content: extractMessageContent(m)
-        }))
-      ];
-      
-      // Use GPT-4o-mini as fallback (GPT-5 structure ready)
-      const response = await openai.chat.completions.create({
-        model: 'gpt-4o-mini',
-        messages: apiMessages,
-        temperature: 0.8,
-        max_tokens: 150,
-        stream: false
-      });
-      
-      const responseContent = response.choices[0]?.message?.content || '';
-      
-      // Update conversation phase based on turn count
-      if (state.turnCount >= 2) {
-        state.phase = 'converging';
-      }
-      
-      return NextResponse.json({
-        message: responseContent,
-        phase: state.phase,
-        turnCount: state.turnCount
-      });
-      
-    } catch (error) {
-      console.error('Conversation API error:', error);
-      
-      // Fallback responses based on turn
-      const fallbackResponses = [
-        "That's fascinating! Tell me more about your role and what aspects interest you most.",
-        "I understand. What specific dimensions should I focus on - technological, social, or policy changes?",
-        "I have enough context to start researching. Ready for me to create your project brief?"
-      ];
-      
-      return NextResponse.json({
-        message: fallbackResponses[Math.min(state.turnCount - 1, 2)] || fallbackResponses[2],
-        phase: state.phase,
-        turnCount: state.turnCount
-      });
-    }
+    // Return SSE response
+    return new NextResponse(stream, {
+      headers: {
+        'Content-Type': 'text/event-stream',
+        'Cache-Control': 'no-cache',
+        'Connection': 'keep-alive',
+      },
+    });
     
   } catch (error) {
     console.error('Project conversation error:', error);
@@ -248,13 +420,15 @@ export async function POST(request: Request) {
   }
 }
 
-// Clean up old conversation states periodically (in production, use proper session management)
-setInterval(() => {
-  const now = Date.now();
-  conversationStates.forEach((state, id) => {
-    // Remove conversations older than 1 hour
-    if (!state.previousResponseId) {
-      conversationStates.delete(id);
-    }
-  });
-}, 60 * 60 * 1000); // Every hour
+// Clean up old conversation states periodically
+if (typeof setInterval !== 'undefined') {
+  setInterval(() => {
+    const now = Date.now();
+    conversationStates.forEach((state, id) => {
+      // Remove conversations older than 1 hour
+      if (!state.previousResponseId) {
+        conversationStates.delete(id);
+      }
+    });
+  }, 60 * 60 * 1000); // Every hour
+}

@@ -99,13 +99,18 @@ export function BriefCanvas({
       {/* Brief Canvas */}
       <div 
         className={`
-          relative p-8 rounded-lg border transition-all duration-300
+          relative p-8 rounded-lg border transition-all duration-300 group
           ${isEditing 
             ? 'bg-white border-stone-400 shadow-lg' 
             : 'bg-gradient-to-br from-stone-50 to-white border-stone-200 hover:shadow-md cursor-pointer'
           }
         `}
-        onClick={() => !isEditing && isTypewriterComplete && handleEdit()}
+        onClick={() => {
+          console.log('Brief canvas clicked:', { isEditing, showTypewriter, typewriterProgress });
+          if (!isEditing) {
+            handleEdit();
+          }
+        }}
         onKeyDown={handleKeyDown}
       >
         {/* Label */}
@@ -127,7 +132,7 @@ export function BriefCanvas({
         {/* Brief Content */}
         <div 
           ref={briefRef}
-          className="font-sans text-base md:text-lg text-stone-700 leading-relaxed outline-none"
+          className="font-sans text-base md:text-lg text-stone-700 leading-relaxed outline-none whitespace-pre-wrap"
           contentEditable={isEditing}
           suppressContentEditableWarning={true}
           onBlur={() => isEditing && handleSave()}
@@ -139,7 +144,7 @@ export function BriefCanvas({
         </div>
         
         {/* Edit hint */}
-        {!isEditing && isTypewriterComplete && (
+        {!isEditing && (
           <div className="absolute bottom-2 right-2 text-xs text-stone-400 opacity-0 group-hover:opacity-100 transition-opacity">
             Click to edit
           </div>
@@ -153,13 +158,11 @@ export function BriefCanvas({
         )}
       </div>
       
-      {/* Action hints (only show when not editing and typewriter complete) */}
-      {!isEditing && isTypewriterComplete && (
+      {/* Action hints (only show when not editing) */}
+      {!isEditing && (
         <div className="mt-6 text-center text-sm text-stone-400 animate-fade-in">
-          <span className="hidden md:inline">Tab to edit</span>
+          <span className="hidden md:inline">Click to edit</span>
           <span className="md:hidden">Tap to edit</span>
-          <span className="mx-3">·</span>
-          <span>Enter to confirm</span>
         </div>
       )}
     </div>

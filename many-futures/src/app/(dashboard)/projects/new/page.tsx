@@ -15,6 +15,7 @@ export default function NewProjectPage() {
   
   const containerRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
   
   const {
     messages,
@@ -48,6 +49,11 @@ export default function NewProjectPage() {
     }
   }, [messages.length]);
   
+  // Auto-scroll to bottom when messages change
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [messages, isLoading, phase]);
+  
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
@@ -59,8 +65,11 @@ export default function NewProjectPage() {
     
     if (!input.trim() || isLoading) return;
     
-    await sendMessage(input);
+    // Store input value and clear immediately for better UX
+    const message = input.trim();
     setInput("");
+    
+    await sendMessage(message);
   };
   
   const handleCreateProject = () => {
@@ -79,6 +88,7 @@ export default function NewProjectPage() {
   };
   
   const handleContinueShaping = async () => {
+    setInput(""); // Clear any existing input
     await sendMessage("I'd like to shape this further");
   };
   
@@ -140,7 +150,7 @@ export default function NewProjectPage() {
       {/* Main content */}
       <div 
         ref={containerRef}
-        className="min-h-screen flex flex-col justify-center items-center px-8 transition-all duration-700 ease-out"
+        className="min-h-screen flex flex-col justify-center items-center px-8 pb-20 transition-all duration-700 ease-out"
         style={{ maxWidth: '100%' }}
       >
         <div className="w-full max-w-2xl">
@@ -168,7 +178,7 @@ export default function NewProjectPage() {
                 
                 {message.role === 'assistant' ? (
                   <div 
-                    className="font-serif text-xl md:text-2xl text-stone-900 leading-relaxed"
+                    className="font-serif text-xl md:text-2xl text-stone-900 leading-relaxed whitespace-pre-wrap"
                     style={{ 
                       opacity: index < messages.length - 2 ? 0.6 : 1,
                       transition: 'opacity 0.6s ease'
@@ -178,7 +188,7 @@ export default function NewProjectPage() {
                   </div>
                 ) : (
                   <div 
-                    className="font-sans text-lg md:text-xl text-stone-700 leading-relaxed"
+                    className="font-sans text-lg md:text-xl text-stone-700 leading-relaxed whitespace-pre-wrap"
                     style={{ 
                       opacity: index < messages.length - 1 ? 0.8 : 1,
                       transition: 'opacity 0.6s ease'
@@ -221,9 +231,14 @@ export default function NewProjectPage() {
             {/* Brief Canvas */}
             {projectBrief && phase === 'brief_generated' && (
               <>
+                {console.log('Rendering BriefCanvas with:', { 
+                  title: projectBrief.title, 
+                  brief: projectBrief.brief,
+                  fullObject: projectBrief 
+                })}
                 <BriefCanvas
                   title={projectBrief.title}
-                  brief={projectBrief.brief}
+                  brief={projectBrief.brief || (projectBrief as any).content || 'Brief content not found'}
                   onSave={saveBrief}
                   showTypewriter={true}
                 />
@@ -258,6 +273,9 @@ export default function NewProjectPage() {
                 disabled={isLoading}
               />
             </form>
+            
+            {/* Invisible div for scroll targeting */}
+            <div ref={messagesEndRef} />
           </div>
           
           {/* Keyboard hints */}

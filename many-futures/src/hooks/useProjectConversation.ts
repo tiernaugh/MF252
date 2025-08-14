@@ -47,9 +47,15 @@ export function useProjectConversation(): UseProjectConversationReturn {
   const [turnCount, setTurnCount] = useState(0);
   
   const conversationId = useRef(`conv-${Date.now()}`);
+  const abortControllerRef = useRef<AbortController | null>(null);
   
   const sendMessage = useCallback(async (content: string) => {
     if (!content.trim() || isLoading) return;
+    
+    // Cancel any ongoing request
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+    }
     
     // Add user message
     const userMessage: Message = {
@@ -65,6 +71,9 @@ export function useProjectConversation(): UseProjectConversationReturn {
     setTurnCount(prev => prev + 1);
     
     try {
+      // Create new abort controller for this request
+      abortControllerRef.current = new AbortController();
+      
       // Prepare messages for API (exclude opening message)
       const apiMessages = [...messages.slice(1), userMessage].map(msg => ({
         role: msg.role,
@@ -77,43 +86,87 @@ export function useProjectConversation(): UseProjectConversationReturn {
         body: JSON.stringify({
           messages: apiMessages,
           conversationId: conversationId.current
-        })
+        }),
+        signal: abortControllerRef.current.signal
       });
       
       if (!response.ok) {
         throw new Error('Failed to get response');
       }
       
-      const data = await response.json();
+      // Handle SSE streaming
+      const reader = response.body?.getReader();
+      const decoder = new TextDecoder();
       
-      // Check if this is a brief generation response
-      if (data.message.includes('BRIEF_GENERATION_SIGNAL')) {
-        // Parse the brief
-        const lines = data.message.split('\n').filter((line: string) => line.trim());
-        const titleLine = lines.find((line: string) => line.startsWith('Title:'));
-        const briefLine = lines.find((line: string) => line.startsWith('Brief:'));
-        
-        if (titleLine && briefLine) {
-          const title = titleLine.replace('Title:', '').trim();
-          const brief = briefLine.replace('Brief:', '').trim();
-          
-          setProjectBrief({ title, brief });
-          setPhase('brief_generated');
-        }
-      } else {
-        // Regular conversation response
-        const assistantMessage: Message = {
-          id: `msg-${Date.now() + 1}`,
-          role: 'assistant',
-          content: data.message,
-          timestamp: new Date()
-        };
-        
-        setMessages(prev => [...prev, assistantMessage]);
-        setPhase(data.phase || 'exploring');
+      if (!reader) {
+        throw new Error('No response body');
       }
       
-    } catch (err) {
+      let assistantMessage = '';
+      let currentMessageId = `msg-${Date.now() + 1}`;
+      let messageStarted = false;
+      
+      while (true) {
+        const { done, value } = await reader.read();
+        
+        if (done) break;
+        
+        const chunk = decoder.decode(value, { stream: true });
+        
+        // Check for BRIEF_GENERATION signal
+        if (chunk.startsWith('BRIEF_GENERATION:')) {
+          const briefData = chunk.substring('BRIEF_GENERATION:'.length).trim();
+          console.log('Received brief data:', briefData);
+          try {
+            const brief = JSON.parse(briefData);
+            console.log('Parsed brief:', brief);
+            setProjectBrief(brief);
+            setPhase('brief_generated');
+          } catch (e) {
+            console.error('Failed to parse brief:', e);
+            console.error('Raw brief data:', briefData);
+          }
+          break;
+        }
+        
+        // Regular text streaming
+        assistantMessage += chunk;
+        
+        // Update or create assistant message
+        if (!messageStarted) {
+          messageStarted = true;
+          setMessages(prev => [...prev, {
+            id: currentMessageId,
+            role: 'assistant',
+            content: assistantMessage,
+            timestamp: new Date()
+          }]);
+        } else {
+          // Update existing message
+          setMessages(prev => prev.map(msg => 
+            msg.id === currentMessageId 
+              ? { ...msg, content: assistantMessage.trim() }
+              : msg
+          ));
+        }
+        
+        // Update phase based on content
+        if (assistantMessage.toLowerCase().includes('ready for me to create') || 
+            assistantMessage.toLowerCase().includes('create your project brief')) {
+          setPhase('converging');
+        } else if (turnCount >= 2) {
+          setPhase('converging');
+        } else {
+          setPhase('exploring');
+        }
+      }
+      
+    } catch (err: any) {
+      if (err.name === 'AbortError') {
+        console.log('Request was aborted');
+        return;
+      }
+      
       console.error('Conversation error:', err);
       setError('Failed to connect to Futura. Please try again.');
       
@@ -128,10 +181,16 @@ export function useProjectConversation(): UseProjectConversationReturn {
       setMessages(prev => [...prev, fallbackMessage]);
     } finally {
       setIsLoading(false);
+      abortControllerRef.current = null;
     }
   }, [messages, isLoading, turnCount]);
   
   const reset = useCallback(() => {
+    // Cancel any ongoing request
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+    }
+    
     setMessages([OPENING_MESSAGE]);
     setPhase('opening');
     setIsLoading(false);

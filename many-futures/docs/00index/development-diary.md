@@ -51,3 +51,131 @@
 ### URLs
 - GitHub: https://github.com/tiernaugh/MF252
 - Vercel Deployment: [Check Vercel dashboard for URL]
+
+---
+
+## Day 5 - Design System Implementation
+
+### Unified Editorial Design (Option C)
+- **Decision**: Hybrid approach - editorial aesthetic on functional pages
+- **Philosophy**: "The Economist meets Substack"
+- **Implementation**:
+  - Serif typography (Lora) for all major headings
+  - Context-aware navigation (full for lists, minimal for reading)
+  - White backgrounds for reading clarity
+  - Hover effects with shadow-xl and subtle y-translation
+
+### Component Updates
+- **Projects Page**: Grid layout with serif card titles
+- **Project Detail**: Three-zone layout (hero, content, metadata)
+- **Episode Reader**: Editorial typography throughout
+- **Navigation**: Auto-hides on scroll for reading pages
+
+### Design System Outcomes
+- Clean separation between UI text (sans) and content (serif)
+- Improved visual hierarchy with size and weight
+- Better reading experience with pure white backgrounds
+- Professional appearance without sacrificing functionality
+
+---
+
+## Day 6 - Conversational UI & Production Deployment
+
+### Major Achievement: Conversational UI Implementation
+- **Ported from Prototype**: Successfully migrated conversational project creation flow
+- **GPT-5 Ready**: API structure prepared for GPT-5 Responses API
+- **Fallback to GPT-4o-mini**: Works today while awaiting GPT-5 access
+- **Components Created**:
+  - FuturaAvatar: Animated purple gradient orb
+  - BriefCanvas: ContentEditable with typewriter effect
+  - useProjectConversation: State management hook
+  - API route with conversation memory
+
+### Key Implementation Details
+- **Synthesis Over Clarification**: Handles "all of it" responses intelligently
+- **Phase-Based Progress**: Not rigid turn counting
+- **Keyboard Shortcuts**: Tab to edit, Enter to confirm
+- **Error Handling**: Graceful fallbacks when API unavailable
+
+### Database Schema Refinement
+- **Created Working Document**: `/src/lib/database-schema.ts`
+- **Critical Security Fixes**:
+  - Added OrganizationMember junction table
+  - Removed dangerous dailyTotal field
+  - Added Subscription table for Stripe
+  - Added audit trail fields (deletedAt, deletedBy)
+  - Added provider field to TokenUsage
+
+### Production Deployment
+- **Status**: Successfully deployed to Vercel ✅
+- **Build**: Clean with no TypeScript errors
+- **Known Issues**: 
+  - 500 error on `/projects/[id]` page (Next.js 15 params handling)
+  - Needs fix for production use
+
+### Progress Metrics
+- **Days Elapsed**: 6 of 14
+- **Completion**: ~40% of MVP features
+- **Major Wins**: UI scaffold complete, conversational UI working
+- **Major Risks**: Database integration timeline, payment system complexity
+
+### Next Priorities
+1. ✅ **Fixed**: 500 error on project detail pages (Next.js 15 params issue)
+2. ✅ **Completed**: Test conversational UI with real GPT-5 API integration
+3. Begin Supabase integration
+4. Implement token usage tracking
+5. Set up cost controls (£50/day limit)
+
+---
+
+## Day 7 - GPT-5 Integration & UX Refinements
+
+### GPT-5 Responses API Implementation
+- **Major Breakthrough**: Successfully implemented GPT-5 Responses API in production
+- **Hybrid Approach**: GPT-5 primary with GPT-4o-mini fallback for reliability
+- **Technical Achievement**: Server-Sent Events streaming with `BRIEF_GENERATION:` signals
+- **Performance**: Fast, concise responses with minimal reasoning effort
+
+### Critical API Learning
+- **Parameter Distinction Discovery**: 
+  - `input` = actual conversation messages (what to respond to)
+  - `instructions` = system prompts/templates (how to respond)
+- **Common Error Fixed**: "missing required parameter" when swapping input/instructions
+- **Message Format Handling**: Built robust parser for Vercel AI SDK format compatibility
+
+### UX Bug Fixes
+- **Input Clearing**: Fixed timing - now clears immediately on submit (responsive UX)
+- **Auto-Scroll**: Added smooth scroll-to-bottom for conversational flow
+- **Brief Editing**: Fixed click-to-edit functionality (missing `group` CSS class)
+- **Layout**: Added bottom padding to prevent input cutoff on mobile
+
+### Documentation & Knowledge Management
+- **Strategic Context Files Created**:
+  - `/src/app/api/CLAUDE.md` - Streaming patterns & GPT-5 integration
+  - `/src/components/CLAUDE.md` - UX patterns & conversational UI
+  - `/src/hooks/CLAUDE.md` - Data handling & state management
+  - `/src/app/(dashboard)/projects/CLAUDE.md` - Troubleshooting guide
+
+### Technical Validations
+- **Conversational Flow**: Properly handles "all of it" responses without clarification loops
+- **Brief Generation**: Clean separation between conversation and brief creation phases
+- **Error Handling**: Graceful fallbacks, abort controller pattern for race conditions
+- **State Management**: Phase-based conversation tracking with proper cleanup
+
+### Quality Assurance
+- **Brief Editing**: Click-to-edit now works reliably with proper focus management
+- **Data Structure Consistency**: Handles multiple API response formats robustly
+- **Streaming Performance**: Progressive text rendering with typewriter effects
+
+### Progress Metrics
+- **Days Elapsed**: 7 of 14
+- **Completion**: ~60% of MVP features (significant jump due to GPT-5 integration)
+- **Major Wins**: Production-ready conversational UI, comprehensive documentation
+- **Confidence Level**: High - core user experience is polished and functional
+
+### Next Phase Priorities
+1. Supabase database integration (user accounts, projects, episodes)
+2. Clerk authentication setup
+3. Token usage tracking with cost controls
+4. n8n webhook integration for episode generation
+5. Stripe payment system

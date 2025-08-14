@@ -131,6 +131,149 @@ const [project, setProject] = useState<ProjectData | null>(null);
 7. **Array access without null checks in JSX**
 8. **Not running `pnpm typecheck` before committing**
 
+## Conversational UI Patterns (Critical for Project Creation)
+
+### Input Clearing Best Practice
+```typescript
+// ❌ BAD - Clears after async operation (slow UX)
+const handleSubmit = async (e: React.FormEvent) => {
+  e.preventDefault();
+  await sendMessage(input);
+  setInput(""); // User sees old text during API call
+};
+
+// ✅ GOOD - Clear immediately (responsive UX)
+const handleSubmit = async (e: React.FormEvent) => {
+  e.preventDefault();
+  const message = input.trim();
+  setInput(""); // Clear immediately
+  await sendMessage(message);
+};
+```
+
+### Auto-Scroll Pattern
+```typescript
+// Essential for conversational interfaces
+const messagesEndRef = useRef<HTMLDivElement>(null);
+
+useEffect(() => {
+  messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+}, [messages, isLoading, phase]); // Scroll on any conversation change
+
+// At bottom of messages container:
+return (
+  <div>
+    {messages.map(msg => <MessageComponent key={msg.id} {...msg} />)}
+    {isLoading && <TypingIndicator />}
+    <div ref={messagesEndRef} /> {/* Invisible scroll target */}
+  </div>
+);
+```
+
+### ContentEditable Click-to-Edit Pattern
+```typescript
+// Handle click-to-edit functionality (for BriefCanvas)
+const [isEditing, setIsEditing] = useState(false);
+const contentRef = useRef<HTMLDivElement>(null);
+
+const handleClick = () => {
+  setIsEditing(true);
+  setTimeout(() => {
+    contentRef.current?.focus();
+    // Place cursor at end
+    const range = document.createRange();
+    range.selectNodeContents(contentRef.current!);
+    range.collapse(false);
+    const sel = window.getSelection()!;
+    sel.removeAllRanges();
+    sel.addRange(range);
+  }, 0);
+};
+
+const handleBlur = () => {
+  setIsEditing(false);
+  onSave(title, contentRef.current?.textContent || '');
+};
+
+return (
+  <div 
+    ref={contentRef}
+    contentEditable={isEditing}
+    onClick={handleClick}
+    onBlur={handleBlur}
+    className={`${isEditing ? 'outline-none ring-2 ring-stone-300' : 'cursor-pointer hover:bg-stone-50'}`}
+    suppressContentEditableWarning
+  >
+    {brief}
+  </div>
+);
+```
+
+### Dynamic Layout Transitions
+```typescript
+// Shift from center to top as conversation grows
+const containerRef = useRef<HTMLDivElement>(null);
+
+useEffect(() => {
+  if (messages.length > 1 && containerRef.current) {
+    containerRef.current.style.justifyContent = 'flex-start';
+    containerRef.current.style.paddingTop = '6rem';
+  }
+}, [messages.length]);
+
+// CSS classes for smooth transitions
+<div 
+  ref={containerRef}
+  className="min-h-screen flex flex-col justify-center items-center transition-all duration-700 ease-out pb-20"
+>
+```
+
+### Focus Management
+```typescript
+// Focus input after responses, but not during brief phase
+const inputRef = useRef<HTMLInputElement>(null);
+
+useEffect(() => {
+  if (phase !== 'brief_generated' && !isLoading && inputRef.current) {
+    inputRef.current.focus();
+  }
+}, [phase, isLoading, messages]);
+
+// Prevent focus during loading states
+<input
+  ref={inputRef}
+  disabled={isLoading}
+  className="w-full bg-transparent border-b border-stone-200 pb-2 outline-none"
+/>
+```
+
+### Brief Data Structure Handling
+```typescript
+// Always handle multiple data structure formats
+<BriefCanvas
+  title={projectBrief.title}
+  brief={
+    projectBrief.brief || 
+    (projectBrief as any).content || 
+    'Brief content not found'
+  }
+  onSave={saveBrief}
+  showTypewriter={true}
+/>
+
+// Debug logging when debugging brief issues
+{projectBrief && (
+  <>
+    {console.log('Rendering BriefCanvas with:', { 
+      title: projectBrief.title, 
+      brief: projectBrief.brief,
+      fullObject: projectBrief 
+    })}
+    <BriefCanvas {...props} />
+  </>
+)}
+```
+
 ### Component Checklist
 Before creating a new component:
 - [ ] Does it follow the serif heading pattern?
@@ -142,3 +285,6 @@ Before creating a new component:
 - [ ] **Are event handlers typed correctly?**
 - [ ] **Does it handle undefined/null cases?**
 - [ ] **No TypeScript errors when running `pnpm typecheck`?**
+- [ ] **For conversational UI: Input clears immediately?**
+- [ ] **For conversational UI: Auto-scroll implemented?**
+- [ ] **For editable content: Click-to-edit with proper focus?**
