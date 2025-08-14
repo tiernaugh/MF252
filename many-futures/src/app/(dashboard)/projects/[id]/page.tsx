@@ -164,10 +164,10 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
         {/* Zone 1: Editorial Hero - Centered */}
         {latestEpisode && (
           <section className="max-w-3xl mx-auto px-8 py-16 text-center">
-            {/* Episode Badge */}
-            <span className="inline-block px-4 py-2 bg-stone-100 text-stone-700 text-sm font-medium rounded-full mb-8">
+            {/* Episode Number - More subtle, integrated */}
+            <div className="text-xs uppercase tracking-wider text-stone-500 mb-6">
               Episode {latestEpisode.sequence}
-            </span>
+            </div>
             
             {/* Hero Title - Large Serif, Centered */}
             <h2 className="font-serif text-4xl md:text-5xl font-bold text-stone-900 mb-8 leading-tight max-w-[20ch] mx-auto" 
@@ -189,26 +189,29 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
               {latestEpisode.summary}
             </p>
             
-            {/* Metadata */}
-            <div className="flex items-center justify-center gap-4 text-sm text-stone-500 mb-10">
-              <span>{formatDynamicDate(latestEpisode.publishedAt)}</span>
-              <span className="w-1 h-1 bg-stone-300 rounded-full" />
-              <span>{latestEpisode.readingMinutes} min read</span>
-              {latestEpisode.sources && latestEpisode.sources.length > 0 && (
-                <>
-                  <span className="w-1 h-1 bg-stone-300 rounded-full" />
-                  <span className="flex items-center">
-                    <ExternalLink className="w-3 h-3 mr-1.5" />
-                    {latestEpisode.sources.length} sources
-                  </span>
-                </>
-              )}
-              {isNew(latestEpisode) && (
-                <>
-                  <span className="w-1 h-1 bg-stone-300 rounded-full" />
-                  <Badge className="bg-blue-100 text-blue-700 border-0 text-xs uppercase tracking-wider">NEW</Badge>
-                </>
-              )}
+            {/* Metadata - Date more prominent */}
+            <div className="mb-10">
+              {/* Publication date - larger and more prominent */}
+              <div className="text-base text-stone-700 font-medium mb-3">
+                {formatDynamicDate(latestEpisode.publishedAt)}
+                {isNew(latestEpisode) && (
+                  <Badge className="ml-2 bg-blue-100 text-blue-700 border-0 text-xs uppercase tracking-wider">NEW</Badge>
+                )}
+              </div>
+              
+              {/* Secondary metadata */}
+              <div className="flex items-center justify-center gap-4 text-sm text-stone-500">
+                <span>{latestEpisode.readingMinutes} min read</span>
+                {latestEpisode.sources && latestEpisode.sources.length > 0 && (
+                  <>
+                    <span className="w-1 h-1 bg-stone-300 rounded-full" />
+                    <span className="flex items-center">
+                      <ExternalLink className="w-3 h-3 mr-1.5" />
+                      {latestEpisode.sources.length} sources
+                    </span>
+                  </>
+                )}
+              </div>
             </div>
             
             {/* CTA Button */}
@@ -223,19 +226,33 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
           </section>
         )}
 
-        {/* Upcoming Episode Preview - Still centered for editorial feel */}
+        {/* Upcoming Episode Preview - More editorial */}
         {upcoming && upcoming.status === 'scheduled' && (
-          <section className="max-w-3xl mx-auto px-8 py-12 text-center border-t border-stone-200">
-            <h3 className="text-xs uppercase tracking-wider text-stone-500 font-medium mb-6">
-              COMING {getDayOfWeek(upcoming.scheduledAt)}
-            </h3>
+          <section className="max-w-3xl mx-auto px-8 py-12 border-t border-stone-200">
+            {/* Editorial header */}
+            <div className="text-center mb-8">
+              <div className="text-xs uppercase tracking-wider text-stone-500 mb-2">
+                Next Episode
+              </div>
+              <h3 className="font-serif text-2xl font-semibold text-stone-900">
+                Research in Progress
+              </h3>
+              <p className="text-sm text-stone-600 mt-2">
+                Publishing {getDayOfWeek(upcoming.scheduledAt).charAt(0) + getDayOfWeek(upcoming.scheduledAt).slice(1).toLowerCase()}
+              </p>
+            </div>
             
+            {/* Research questions as editorial teasers */}
             {upcoming.previewQuestions && upcoming.previewQuestions.length > 0 && (
-              <div className="space-y-4 text-left max-w-2xl mx-auto">
+              <div className="space-y-3 max-w-2xl mx-auto">
+                <p className="text-xs uppercase tracking-wider text-stone-500 text-center mb-4">
+                  Exploring
+                </p>
                 {upcoming.previewQuestions.map((question, i) => (
-                  <div key={i} className="flex items-start gap-3">
-                    <span className="text-stone-400 mt-0.5">→</span>
-                    <p className="text-base text-stone-700 leading-relaxed">{question}</p>
+                  <div key={i} className="pl-4 border-l-2 border-stone-200">
+                    <p className="text-base text-stone-700 leading-relaxed italic">
+                      {question}
+                    </p>
                   </div>
                 ))}
               </div>
