@@ -87,7 +87,7 @@ export function useProjectConversation(): UseProjectConversationReturn {
         }
       }, 30000);
       
-      const response = await fetch('/api/project-conversation', {
+      const response = await fetch('/api/project-conversation-simple', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

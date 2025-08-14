@@ -12,14 +12,10 @@ export default function NewProjectPage() {
   const router = useRouter();
   const [input, setInput] = useState("");
   const [showKeyboardHints, setShowKeyboardHints] = useState(false);
-  const [isTypewriterComplete, setIsTypewriterComplete] = useState(false);
-  const [isBriefLocked, setIsBriefLocked] = useState(false);
-  const [hasShownTypewriter, setHasShownTypewriter] = useState(false);
   
   const containerRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
-  const previousBriefRef = useRef<string>('');
   
   const {
     messages,
@@ -38,36 +34,14 @@ export default function NewProjectPage() {
     reset();
   }, [reset]);
   
-  // Reset typewriter state when a NEW brief arrives (not edits)
-  useEffect(() => {
-    const currentBrief = projectBrief?.brief || '';
-    
-    // Check if this is a genuinely new brief (not an edit)
-    // New briefs come from the server, edits come from saveBrief
-    if (currentBrief !== previousBriefRef.current && currentBrief !== '') {
-      // If the brief was locked (user continued conversation) and now we have a different brief,
-      // it's a new generation, not an edit
-      if (isBriefLocked && currentBrief !== previousBriefRef.current) {
-        // New brief after conversation continued - reset everything
-        setIsBriefLocked(false);
-        setHasShownTypewriter(false);
-        setIsTypewriterComplete(false);
-      } else if (!hasShownTypewriter && !isBriefLocked) {
-        // First brief or unlocked brief - show typewriter
-        setIsTypewriterComplete(false);
-      }
-      previousBriefRef.current = currentBrief;
-    }
-  }, [projectBrief?.brief, isBriefLocked, hasShownTypewriter]);
+  // SIMPLIFIED: No typewriter state management
   
-  // Auto-focus input (but not during typewriter animation)
+  // Auto-focus input
   useEffect(() => {
     if (phase !== 'brief_generated' && !isLoading && inputRef.current) {
-      // Don't focus if typewriter is running
-      if (projectBrief && !isTypewriterComplete) return;
       inputRef.current.focus();
     }
-  }, [phase, isLoading, messages, projectBrief, isTypewriterComplete]);
+  }, [phase, isLoading, messages]);
   
   // Shift from center to top as conversation grows
   useEffect(() => {
@@ -93,11 +67,7 @@ export default function NewProjectPage() {
     
     if (!input.trim() || isLoading) return;
     
-    // If brief was generated and user continues typing, lock it
-    if (phase === 'brief_generated' && !isBriefLocked) {
-      setIsBriefLocked(true);
-      setIsTypewriterComplete(false); // Reset for potential new content
-    }
+    // User continuing after brief - phase will reset automatically
     
     // Store input value and clear immediately for better UX
     const message = input.trim();
@@ -155,11 +125,8 @@ export default function NewProjectPage() {
   
   const getPlaceholder = () => {
     if (messages.length === 1) return "What future would you like to explore?";
-    if (phase === 'brief_generated' && !isBriefLocked) {
+    if (phase === 'brief_generated') {
       return "Continue shaping or press Enter to create project...";
-    }
-    if (phase === 'brief_generated' && isBriefLocked) {
-      return "Brief created. Click Create Project to start research";
     }
     if (isLoading) return "";
     return "Type your response...";
@@ -269,7 +236,7 @@ export default function NewProjectPage() {
                       {error.includes('try again') && (
                         <button
                           onClick={() => {
-                            setError(null);
+                            // Error cleared automatically by hook
                             // Retry last message if exists
                             if (messages.length > 1) {
                               const lastUserMessage = [...messages].reverse().find(m => m.role === 'user');
@@ -289,37 +256,29 @@ export default function NewProjectPage() {
               </div>
             )}
             
-            {/* Brief Canvas - keep visible even after conversation continues */}
+            {/* Brief Canvas - SIMPLIFIED */}
             {projectBrief && phase === 'brief_generated' && (
               <>
                 <BriefCanvas
                   title={projectBrief.title}
                   brief={projectBrief.brief || (projectBrief as any).content || 'Brief content not found'}
                   onSave={saveBrief}
-                  showTypewriter={!hasShownTypewriter && !isBriefLocked}
-                  isLocked={isBriefLocked}
-                  onTypewriterComplete={() => {
-                    setIsTypewriterComplete(true);
-                    setHasShownTypewriter(true);
-                  }}
                 />
                 
-                {/* Action button - only show when typewriter is complete and brief not locked */}
-                {isTypewriterComplete && !isBriefLocked && (
-                  <div className="mt-8 flex justify-center animate-fade-in">
-                    <button
-                      onClick={handleCreateProject}
-                      className="px-6 py-3 text-sm bg-stone-900 text-white rounded-lg hover:bg-stone-800 transition-colors"
-                    >
-                      Create Project
-                    </button>
-                  </div>
-                )}
+                {/* Action button - always visible */}
+                <div className="mt-8 flex justify-center animate-fade-in">
+                  <button
+                    onClick={handleCreateProject}
+                    className="px-6 py-3 text-sm bg-stone-900 text-white rounded-lg hover:bg-stone-800 transition-colors"
+                  >
+                    Create Project
+                  </button>
+                </div>
               </>
             )}
             
-            {/* Input field - hide during typewriter animation */}
-            {(!projectBrief || phase !== 'brief_generated' || isTypewriterComplete) && (
+            {/* Input field - always visible */}
+            {(
               <form onSubmit={handleSubmit} className="mt-8">
                 <input
                   ref={inputRef}

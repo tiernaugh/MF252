@@ -15,49 +15,30 @@ export function BriefCanvas({
   title: initialTitle, 
   brief: initialBrief, 
   onSave,
-  showTypewriter = true,
+  showTypewriter = false, // Default to no typewriter for simplicity
   isLocked = false,
   onTypewriterComplete
 }: BriefCanvasProps) {
   const [isEditing, setIsEditing] = useState(false);
   const [title, setTitle] = useState(initialTitle);
   const [brief, setBrief] = useState(initialBrief);
-  const [displayedBrief, setDisplayedBrief] = useState(showTypewriter ? '' : initialBrief);
-  const [typewriterProgress, setTypewriterProgress] = useState(0);
+  const [displayedBrief, setDisplayedBrief] = useState(initialBrief); // Always show full text
   
   const briefRef = useRef<HTMLDivElement>(null);
   const titleRef = useRef<HTMLDivElement>(null);
 
-  // Typewriter effect
+  // SIMPLIFIED: Immediate display, no typewriter
+  // (Keeping the prop interface for backward compatibility)
   useEffect(() => {
-    if (!showTypewriter || !initialBrief) return;
-    
-    let currentIndex = 0;
-    const fullText = initialBrief;
-    
-    const typeInterval = setInterval(() => {
-      if (currentIndex < fullText.length) {
-        setDisplayedBrief(fullText.slice(0, currentIndex));
-        setTypewriterProgress((currentIndex / fullText.length) * 100);
-        currentIndex += 2; // Type 2 characters at a time
-      } else {
-        // Ensure we display the complete text
-        setDisplayedBrief(fullText);
-        setTypewriterProgress(100);
-        clearInterval(typeInterval);
-        // Notify parent when typewriter completes
-        if (onTypewriterComplete) {
-          onTypewriterComplete();
-        }
-      }
-    }, 30);
-    
-    return () => clearInterval(typeInterval);
-  }, [initialBrief, showTypewriter, onTypewriterComplete]);
+    setDisplayedBrief(initialBrief);
+    if (onTypewriterComplete) {
+      onTypewriterComplete();
+    }
+  }, [initialBrief, onTypewriterComplete]);
 
   const handleEdit = () => {
-    // Don't allow editing if locked or typewriter is still running
-    if (isLocked || (showTypewriter && typewriterProgress < 100)) return;
+    // Don't allow editing if locked
+    if (isLocked) return;
     
     setIsEditing(true);
     
@@ -96,7 +77,7 @@ export function BriefCanvas({
     }
   };
 
-  const isTypewriterComplete = !showTypewriter || typewriterProgress >= 100;
+  const isTypewriterComplete = true; // Always complete in simplified version
 
   return (
     <div className="animate-fade-in-up mt-12">
@@ -150,9 +131,6 @@ export function BriefCanvas({
           onBlur={() => isEditing && handleSave()}
         >
           {isEditing ? brief : displayedBrief}
-          {!isEditing && showTypewriter && typewriterProgress < 100 && (
-            <span className="inline-block w-[2px] h-5 bg-stone-400 animate-pulse ml-1 align-middle" />
-          )}
         </div>
         
         {/* Edit hint */}
