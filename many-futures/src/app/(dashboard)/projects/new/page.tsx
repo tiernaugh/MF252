@@ -2,291 +2,332 @@
 
 import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
-import Link from "next/link";
-import { Button } from "~/components/ui/button";
-import { Input } from "~/components/ui/input";
-import { Card } from "~/components/ui/card";
-import { ArrowLeft, Send, Sparkles } from "lucide-react";
-
-type Message = {
-  id: string;
-  role: "user" | "assistant";
-  content: string;
-};
-
-// Mock Futura responses based on conversation progress
-const getFuturaResponse = (turnCount: number, userMessage: string): string => {
-  const responses = [
-    "That's fascinating! Can you tell me more about your role and what specific aspects of this future interest you most?",
-    "I understand. Now, what's the context for your curiosity? Are you exploring this for your organization, personal growth, or something else?",
-    "Great context. What are the key areas you'd like me to focus on? For example, are you more interested in technological shifts, market dynamics, cultural changes, or regulatory developments?",
-    "Perfect! I have everything I need to start researching for you. Let me create your project brief..."
-  ];
-  
-  return responses[Math.min(turnCount, responses.length - 1)] ?? responses[responses.length - 1]!;
-};
-
-const generateBrief = (messages: Message[]): string => {
-  return `# Project Brief
-
-Based on our conversation, I'll research and deliver weekly intelligence on your chosen future.
-
-## Your Context
-You're exploring how emerging trends and signals will reshape your industry and strategic position.
-
-## Research Focus Areas
-- Technological disruptions and opportunities
-- Changing market dynamics and competitive landscape
-- Cultural and behavioral shifts
-- Regulatory and compliance evolution
-
-## Delivery Preferences
-- **Tone**: Provocative and thought-provoking
-- **Speculation Level**: High - exploring edge cases and possibilities
-- **Cadence**: Weekly episodes, delivered every Tuesday
-
-I'll start researching immediately and your first episode will be ready in 24 hours.`;
-};
+import { X } from "lucide-react";
+import { FuturaAvatar } from "~/components/brand/FuturaAvatar";
+import { BriefCanvas } from "~/components/project/BriefCanvas";
+import { useProjectConversation } from "~/hooks/useProjectConversation";
+import { mockProjects } from "~/lib/mock-data";
 
 export default function NewProjectPage() {
   const router = useRouter();
-  const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
-  const [isTyping, setIsTyping] = useState(false);
-  const [briefGenerated, setBriefGenerated] = useState(false);
-  const [briefText, setBriefText] = useState("");
-  const [briefProgress, setBriefProgress] = useState(0);
-  const messagesEndRef = useRef<HTMLDivElement>(null);
+  const [showKeyboardHints, setShowKeyboardHints] = useState(false);
+  
+  const containerRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
-
-  // Initial greeting
+  
+  const {
+    messages,
+    phase,
+    isLoading,
+    error,
+    projectBrief,
+    turnCount,
+    sendMessage,
+    reset,
+    saveBrief
+  } = useProjectConversation();
+  
+  // Initialize conversation
   useEffect(() => {
-    setTimeout(() => {
-      setMessages([{
-        id: "1",
-        role: "assistant",
-        content: "Hi! I'm Futura, your futures research agent. What future are you curious about? It could be an industry trend, a technology shift, or any change you want to understand better."
-      }]);
-    }, 500);
-  }, []);
-
-  // Auto-scroll to bottom
+    reset();
+  }, [reset]);
+  
+  // Auto-focus input
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages]);
-
-  // Focus input after bot responds
-  useEffect(() => {
-    if (!isTyping && !briefGenerated) {
-      inputRef.current?.focus();
+    if (phase !== 'brief_generated' && !isLoading && inputRef.current) {
+      inputRef.current.focus();
     }
-  }, [isTyping, briefGenerated]);
-
-  // Typewriter effect for brief
+  }, [phase, isLoading, messages]);
+  
+  // Shift from center to top as conversation grows
   useEffect(() => {
-    if (briefGenerated && briefText) {
-      const fullText = briefText;
-      let currentIndex = 0;
-      setBriefProgress(0);
-      
-      const typeInterval = setInterval(() => {
-        if (currentIndex <= fullText.length) {
-          setBriefProgress((currentIndex / fullText.length) * 100);
-          currentIndex += 3; // Type 3 characters at a time
-        } else {
-          clearInterval(typeInterval);
-        }
-      }, 20);
-      
-      return () => clearInterval(typeInterval);
+    if (messages.length > 1 && containerRef.current) {
+      containerRef.current.style.justifyContent = 'flex-start';
+      containerRef.current.style.paddingTop = '6rem';
     }
-  }, [briefGenerated, briefText]);
-
+  }, [messages.length]);
+  
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!input.trim()) return;
+    // If brief is generated and Enter pressed without text, confirm
+    if (phase === 'brief_generated' && !input.trim()) {
+      handleCreateProject();
+      return;
+    }
     
-    const userMessage: Message = {
-      id: Date.now().toString(),
-      role: "user",
-      content: input.trim()
-    };
+    if (!input.trim() || isLoading) return;
     
-    setMessages(prev => [...prev, userMessage]);
+    await sendMessage(input);
     setInput("");
-    setIsTyping(true);
-    
-    // Simulate AI thinking
-    setTimeout(() => {
-      const turnCount = messages.filter(m => m.role === "user").length;
-      
-      if (turnCount >= 3) {
-        // Generate brief after 4 turns
-        const brief = generateBrief([...messages, userMessage]);
-        setBriefText(brief);
-        setBriefGenerated(true);
-        setIsTyping(false);
-      } else {
-        // Continue conversation
-        const aiResponse: Message = {
-          id: (Date.now() + 1).toString(),
-          role: "assistant",
-          content: getFuturaResponse(turnCount, userMessage.content)
-        };
-        setMessages(prev => [...prev, aiResponse]);
-        setIsTyping(false);
-      }
-    }, 1500);
   };
-
+  
   const handleCreateProject = () => {
+    if (!projectBrief) return;
+    
     // In production, save to database
-    console.log("Creating project with brief:", briefText);
-    router.push("/projects");
+    // For now, just navigate to projects
+    console.log("Creating project:", projectBrief);
+    
+    // Generate a new project ID
+    const newProjectId = `proj_${Date.now()}`;
+    
+    // In production, this would be saved to database
+    // For demo, we'll just navigate
+    router.push(`/projects/${mockProjects[0]?.id || newProjectId}`);
   };
-
+  
+  const handleContinueShaping = async () => {
+    await sendMessage("I'd like to shape this further");
+  };
+  
+  const handleClose = () => {
+    if (messages.length > 1) {
+      if (confirm('Leave project creation? Your conversation will be lost.')) {
+        router.push('/projects');
+      }
+    } else {
+      router.push('/projects');
+    }
+  };
+  
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    // Global keyboard shortcuts
+    if (e.key === 'Escape') {
+      if (showKeyboardHints) {
+        setShowKeyboardHints(false);
+      } else {
+        handleClose();
+      }
+    }
+    
+    if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
+      e.preventDefault();
+      setShowKeyboardHints(!showKeyboardHints);
+    }
+    
+    if ((e.metaKey || e.ctrlKey) && e.key === 'Enter' && turnCount >= 1) {
+      e.preventDefault();
+      // Force brief generation
+      sendMessage("Yes, create my brief");
+    }
+  };
+  
+  const getPlaceholder = () => {
+    if (messages.length === 1) return "What future would you like to explore?";
+    if (phase === 'brief_generated') {
+      return "Press Enter to confirm, or continue the conversation...";
+    }
+    if (isLoading) return "";
+    return "Type your response...";
+  };
+  
   return (
-    <div className="max-w-3xl mx-auto">
-      {/* Header */}
-      <div className="mb-6">
-        <Link href="/projects">
-          <Button variant="ghost" className="mb-4">
-            <ArrowLeft className="w-4 h-4 mr-2" />
-            Back to projects
-          </Button>
-        </Link>
-        <h1 className="text-2xl font-bold text-stone-900">Create New Project</h1>
-        <p className="text-stone-600 mt-1">
-          Tell Futura what future you want to explore
-        </p>
-      </div>
-
-      {/* Conversation UI */}
-      <Card className="h-[600px] flex flex-col">
-        {/* Messages */}
-        <div className="flex-1 overflow-y-auto p-6 space-y-4">
-          {messages.map((message) => (
-            <div
-              key={message.id}
-              className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}
-            >
-              <div className={`flex items-start space-x-2 max-w-[80%] ${
-                message.role === 'user' ? 'flex-row-reverse space-x-reverse' : ''
-              }`}>
-                {message.role === 'assistant' && (
-                  <div className="w-8 h-8 bg-stone-900 rounded-full flex items-center justify-center flex-shrink-0">
-                    <Sparkles className="w-4 h-4 text-white" />
+    <div 
+      className="min-h-screen bg-white relative"
+      onKeyDown={handleKeyDown}
+    >
+      {/* Subtle close button */}
+      <button
+        onClick={handleClose}
+        className="absolute top-8 right-8 p-2 text-stone-400 hover:text-stone-600 transition-colors z-10"
+        aria-label="Close"
+      >
+        <X className="w-5 h-5" />
+      </button>
+      
+      {/* Main content */}
+      <div 
+        ref={containerRef}
+        className="min-h-screen flex flex-col justify-center items-center px-8 transition-all duration-700 ease-out"
+        style={{ maxWidth: '100%' }}
+      >
+        <div className="w-full max-w-2xl">
+          {/* Opening state with orb */}
+          {messages.length === 1 && (
+            <div className="text-center animate-fade-in mb-8">
+              <div className="inline-block rounded-full overflow-hidden">
+                <FuturaAvatar size={60} />
+              </div>
+            </div>
+          )}
+          
+          {/* Messages */}
+          <div className="space-y-8">
+            {messages.map((message, index) => (
+              <div key={message.id} className="animate-fade-in-up">
+                {/* Show avatar above first message if not opening */}
+                {index === 1 && (
+                  <div className="text-center mb-8">
+                    <div className="inline-block rounded-full overflow-hidden">
+                      <FuturaAvatar size={60} />
+                    </div>
                   </div>
                 )}
-                <div className={`rounded-lg px-4 py-2 ${
-                  message.role === 'user'
-                    ? 'bg-stone-900 text-white'
-                    : 'bg-stone-100 text-stone-900'
-                }`}>
-                  {message.content}
-                </div>
-              </div>
-            </div>
-          ))}
-          
-          {isTyping && (
-            <div className="flex justify-start">
-              <div className="flex items-start space-x-2">
-                <div className="w-8 h-8 bg-stone-900 rounded-full flex items-center justify-center">
-                  <Sparkles className="w-4 h-4 text-white animate-pulse" />
-                </div>
-                <div className="bg-stone-100 rounded-lg px-4 py-2">
-                  <span className="text-stone-600">Futura is thinking...</span>
-                </div>
-              </div>
-            </div>
-          )}
-          
-          {briefGenerated && (
-            <div className="mt-6 p-6 bg-gradient-to-br from-stone-50 to-stone-100 rounded-lg border border-stone-200">
-              <div className="flex items-center mb-4">
-                <Sparkles className="w-5 h-5 text-stone-700 mr-2" />
-                <h3 className="font-semibold text-stone-900">Your Project Brief</h3>
-              </div>
-              <div className="prose prose-stone prose-sm max-w-none">
-                <div style={{ 
-                  maxHeight: '300px', 
-                  overflow: 'hidden',
-                  position: 'relative'
-                }}>
-                  <div style={{
-                    opacity: briefProgress / 100,
-                    transition: 'opacity 0.1s'
-                  }}>
-                    {briefText.split('\n').map((line, i) => {
-                      if (line.startsWith('#')) {
-                        const text = line.replace(/^#+\s/, '');
-                        return <h4 key={i} className="font-semibold mt-3 mb-1">{text}</h4>;
-                      }
-                      if (line.startsWith('-')) {
-                        return <li key={i} className="ml-4">{line.substring(1).trim()}</li>;
-                      }
-                      if (line.trim()) {
-                        return <p key={i} className="mb-2">{line}</p>;
-                      }
-                      return null;
-                    })}
-                  </div>
-                  {briefProgress < 100 && (
-                    <div className="absolute bottom-0 left-0 right-0 h-8 bg-gradient-to-t from-stone-100 to-transparent" />
-                  )}
-                </div>
-              </div>
-              {briefProgress >= 100 && (
-                <div className="mt-6 flex gap-3">
-                  <Button 
-                    onClick={handleCreateProject}
-                    className="bg-stone-900 hover:bg-stone-800"
-                  >
-                    Create Project
-                  </Button>
-                  <Button 
-                    variant="outline"
-                    onClick={() => {
-                      setBriefGenerated(false);
-                      setBriefText("");
+                
+                {message.role === 'assistant' ? (
+                  <div 
+                    className="font-serif text-xl md:text-2xl text-stone-900 leading-relaxed"
+                    style={{ 
+                      opacity: index < messages.length - 2 ? 0.6 : 1,
+                      transition: 'opacity 0.6s ease'
                     }}
                   >
-                    Continue Shaping
-                  </Button>
+                    {message.content}
+                  </div>
+                ) : (
+                  <div 
+                    className="font-sans text-lg md:text-xl text-stone-700 leading-relaxed"
+                    style={{ 
+                      opacity: index < messages.length - 1 ? 0.8 : 1,
+                      transition: 'opacity 0.6s ease'
+                    }}
+                  >
+                    {message.content}
+                  </div>
+                )}
+                
+                {/* Separator dot */}
+                {index < messages.length - 1 && (
+                  <div className="flex justify-center py-4">
+                    <div className="w-1 h-1 bg-stone-300 rounded-full" />
+                  </div>
+                )}
+              </div>
+            ))}
+            
+            {/* Typing indicator */}
+            {isLoading && (
+              <div className="animate-fade-in">
+                <div className="flex justify-center py-4">
+                  <div className="w-1 h-1 bg-stone-300 rounded-full" />
                 </div>
-              )}
-            </div>
-          )}
-          
-          <div ref={messagesEndRef} />
-        </div>
-
-        {/* Input */}
-        {!briefGenerated && (
-          <form onSubmit={handleSubmit} className="border-t p-4">
-            <div className="flex gap-2">
-              <Input
+                <div className="font-serif text-xl md:text-2xl text-stone-400">
+                  <span className="inline-block animate-pulse">·</span>
+                  <span className="inline-block animate-pulse" style={{ animationDelay: '0.2s' }}>·</span>
+                  <span className="inline-block animate-pulse" style={{ animationDelay: '0.4s' }}>·</span>
+                </div>
+              </div>
+            )}
+            
+            {/* Error display */}
+            {error && (
+              <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">
+                {error}
+              </div>
+            )}
+            
+            {/* Brief Canvas */}
+            {projectBrief && phase === 'brief_generated' && (
+              <>
+                <BriefCanvas
+                  title={projectBrief.title}
+                  brief={projectBrief.brief}
+                  onSave={saveBrief}
+                  showTypewriter={true}
+                />
+                
+                {/* Action buttons */}
+                <div className="mt-8 flex gap-3 justify-center">
+                  <button
+                    onClick={handleContinueShaping}
+                    className="px-4 py-2 text-sm text-stone-600 hover:text-stone-900 transition-colors"
+                  >
+                    Continue Shaping
+                  </button>
+                  <button
+                    onClick={handleCreateProject}
+                    className="px-4 py-2 text-sm bg-stone-900 text-white rounded-lg hover:bg-stone-800 transition-colors"
+                  >
+                    Start Research →
+                  </button>
+                </div>
+              </>
+            )}
+            
+            {/* Input field - always visible */}
+            <form onSubmit={handleSubmit} className="mt-8">
+              <input
                 ref={inputRef}
                 type="text"
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
-                placeholder="Type your message..."
-                disabled={isTyping}
-                className="flex-1"
+                placeholder={getPlaceholder()}
+                className="w-full bg-transparent border-b border-stone-200 pb-2 outline-none font-sans text-lg md:text-xl text-stone-700 placeholder-stone-400 focus:border-stone-400 transition-colors"
+                disabled={isLoading}
               />
-              <Button 
-                type="submit" 
-                disabled={isTyping || !input.trim()}
-                className="bg-stone-900 hover:bg-stone-800"
-              >
-                <Send className="w-4 h-4" />
-              </Button>
+            </form>
+          </div>
+          
+          {/* Keyboard hints */}
+          {messages.length === 1 && (
+            <div className="text-center mt-12 text-xs text-stone-400 animate-fade-in" style={{ animationDelay: '1.2s' }}>
+              <span className="hidden md:inline">Press ⌘K for keyboard shortcuts</span>
             </div>
-          </form>
+          )}
+        </div>
+        
+        {/* Keyboard shortcuts overlay */}
+        {showKeyboardHints && (
+          <div 
+            className="fixed inset-0 bg-black/20 backdrop-blur-sm flex items-center justify-center z-50 animate-fade-in"
+            onClick={() => setShowKeyboardHints(false)}
+          >
+            <div className="bg-white rounded-lg p-8 max-w-sm shadow-xl">
+              <h3 className="font-serif text-lg font-bold mb-4">Keyboard Shortcuts</h3>
+              <div className="space-y-2 text-sm">
+                <div className="flex justify-between">
+                  <span className="text-stone-600">Send message</span>
+                  <kbd className="px-2 py-1 bg-stone-100 rounded text-xs">Enter</kbd>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-stone-600">Skip to brief</span>
+                  <kbd className="px-2 py-1 bg-stone-100 rounded text-xs">⌘ Enter</kbd>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-stone-600">Confirm brief</span>
+                  <kbd className="px-2 py-1 bg-stone-100 rounded text-xs">Enter</kbd>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-stone-600">Exit</span>
+                  <kbd className="px-2 py-1 bg-stone-100 rounded text-xs">Esc</kbd>
+                </div>
+              </div>
+              <div className="mt-4 text-xs text-stone-400 text-center">
+                Press Esc to close
+              </div>
+            </div>
+          </div>
         )}
-      </Card>
+      </div>
+      
+      {/* Add CSS animations */}
+      <style jsx>{`
+        @keyframes fade-in {
+          from { opacity: 0; }
+          to { opacity: 1; }
+        }
+        
+        @keyframes fade-in-up {
+          from { 
+            opacity: 0;
+            transform: translateY(10px);
+          }
+          to { 
+            opacity: 1;
+            transform: translateY(0);
+          }
+        }
+        
+        .animate-fade-in {
+          animation: fade-in 0.6s ease-out forwards;
+        }
+        
+        .animate-fade-in-up {
+          animation: fade-in-up 0.6s ease-out forwards;
+        }
+      `}</style>
     </div>
   );
 }
