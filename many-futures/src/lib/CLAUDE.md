@@ -145,12 +145,64 @@ export const calculateReadingTime = (content: string) => {
 };
 ```
 
+### TypeScript Strict Mode Guidelines
+
+#### Array Access Safety
+```typescript
+// ❌ BAD - Can return undefined
+const item = array[index] || fallback;  // Type error in strict mode
+
+// ✅ GOOD - Type-safe with nullish coalescing
+const item = array[index] ?? fallback;
+
+// ✅ GOOD - With non-null assertion when guaranteed
+const item = array[index]!;  // Only if you're certain it exists
+
+// ✅ GOOD - Explicit bounds checking
+const item = index < array.length ? array[index] : fallback;
+```
+
+#### Function Return Types
+```typescript
+// ❌ BAD - Implicit any or undefined
+const getItem = (index: number) => {
+  return items[index];  // Could be undefined
+};
+
+// ✅ GOOD - Explicit return type with proper handling
+const getItem = (index: number): string => {
+  return items[index] ?? defaultItem;
+};
+
+// ✅ GOOD - Allow undefined when appropriate
+const getItem = (index: number): string | undefined => {
+  return items[index];
+};
+```
+
+#### Object Property Access
+```typescript
+// ❌ BAD - Assuming properties exist
+const value = obj.nested.property;  // Could throw
+
+// ✅ GOOD - Optional chaining
+const value = obj?.nested?.property ?? defaultValue;
+
+// ✅ GOOD - Type guards
+if ('property' in obj && obj.property) {
+  const value = obj.property;
+}
+```
+
 ### Common Mistakes
 1. Creating active projects without nextScheduledAt
 2. Forgetting organizationId on new entities
 3. Not tracking token usage for AI calls
 4. Using complex block storage instead of Markdown
 5. Showing draft episodes as published
+6. **Using || instead of ?? for fallbacks (causes TypeScript errors)**
+7. **Not specifying explicit return types for functions**
+8. **Accessing array elements without bounds checking**
 
 ### Testing Checklist
 - [ ] All projects have organizationId
@@ -159,3 +211,5 @@ export const calculateReadingTime = (content: string) => {
 - [ ] Episodes have proper status flow
 - [ ] Token usage is tracked
 - [ ] Dates format consistently
+- [ ] **Run `pnpm typecheck` before committing**
+- [ ] **No TypeScript errors or warnings**

@@ -66,11 +66,70 @@
 - ❌ Use badges instead of dots for status
 - ❌ Add icons without clear purpose
 
+### TypeScript Best Practices for Components
+
+#### Props Type Safety
+```tsx
+// ❌ BAD - No type safety
+const Component = ({ title, items }) => {
+  return <div>{items[0]}</div>;  // Could be undefined
+};
+
+// ✅ GOOD - Properly typed props
+interface ComponentProps {
+  title: string;
+  items: string[];
+  defaultItem?: string;
+}
+
+const Component = ({ title, items, defaultItem = "No items" }: ComponentProps) => {
+  return <div>{items[0] ?? defaultItem}</div>;
+};
+```
+
+#### Event Handler Types
+```tsx
+// ❌ BAD - Implicit any
+const handleClick = (e) => {
+  console.log(e.target.value);
+};
+
+// ✅ GOOD - Properly typed events
+const handleClick = (e: React.MouseEvent<HTMLButtonElement>) => {
+  console.log(e.currentTarget.value);
+};
+
+// ✅ GOOD - Form events
+const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
+  e.preventDefault();
+};
+```
+
+#### State Type Safety
+```tsx
+// ❌ BAD - Implicit types
+const [data, setData] = useState(null);
+
+// ✅ GOOD - Explicit types
+const [data, setData] = useState<string | null>(null);
+
+// ✅ GOOD - Complex types
+interface ProjectData {
+  id: string;
+  title: string;
+}
+const [project, setProject] = useState<ProjectData | null>(null);
+```
+
 ### Common Mistakes to Avoid
 1. Forgetting to add serif font to new headings
 2. Using shadow-lg instead of shadow-xl
 3. Using -translate-y-0.5 instead of -translate-y-1
 4. Mixing border-stone-200 with border-stone-300
+5. **Not typing component props interfaces**
+6. **Using implicit any for event handlers**
+7. **Array access without null checks in JSX**
+8. **Not running `pnpm typecheck` before committing**
 
 ### Component Checklist
 Before creating a new component:
@@ -79,3 +138,7 @@ Before creating a new component:
 - [ ] Is padding generous enough (p-8 for cards)?
 - [ ] Are transitions 300ms?
 - [ ] Does it use white background (not stone-50)?
+- [ ] **Are all props properly typed with interfaces?**
+- [ ] **Are event handlers typed correctly?**
+- [ ] **Does it handle undefined/null cases?**
+- [ ] **No TypeScript errors when running `pnpm typecheck`?**

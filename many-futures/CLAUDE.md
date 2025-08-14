@@ -306,13 +306,128 @@ app/
 3. Connect real services incrementally
 4. Test with limited API calls
 
+#### TypeScript Best Practices
+
+##### Type Safety Rules
+```typescript
+// ALWAYS use nullish coalescing for fallbacks
+const value = array[index] ?? defaultValue;  // ✅
+const value = array[index] || defaultValue;   // ❌ Can cause type errors
+
+// ALWAYS specify return types for functions
+const getItem = (index: number): string => {  // ✅
+const getItem = (index: number) => {          // ❌ Implicit any/undefined
+
+// ALWAYS handle undefined cases in JSX
+<div>{items[0] ?? 'No items'}</div>  // ✅
+<div>{items[0]}</div>                // ❌ Could render undefined
+
+// Prefer interfaces over types for objects
+interface ProjectData {  // ✅
+  id: string;
+  title: string;
+}
+type ProjectData = {     // ❌ Use interface instead
+  id: string;
+  title: string;
+}
+
+// Avoid enums, use const maps instead
+const Status = {         // ✅
+  DRAFT: 'DRAFT',
+  PUBLISHED: 'PUBLISHED',
+} as const;
+enum Status {            // ❌ Avoid enums
+  DRAFT,
+  PUBLISHED,
+}
+```
+
+##### Code Style and Structure
+```typescript
+// Use descriptive variable names with auxiliary verbs
+const isLoading = true;      // ✅
+const hasError = false;      // ✅
+const loading = true;        // ❌ Less descriptive
+
+// Use functional and declarative patterns
+const filteredProjects = projects.filter(p => p.active);  // ✅
+let filtered = [];                                        // ❌
+for (let p of projects) {
+  if (p.active) filtered.push(p);
+}
+
+// Structure component files consistently
+export default function ProjectCard() { }  // 1. Main component
+const ProjectHeader = () => { }            // 2. Subcomponents
+const formatDate = () => { }               // 3. Helper functions
+const DEFAULT_STATUS = 'draft';            // 4. Static content
+interface ProjectCardProps { }             // 5. Types
+```
+
+##### Next.js 15 Performance Patterns
+```typescript
+// Minimize 'use client' - favor Server Components
+// ❌ BAD - Entire page is client component
+"use client";
+export default function ProjectsPage() {
+  const [filter, setFilter] = useState('');
+  // ...
+}
+
+// ✅ GOOD - Server component with client islands
+// page.tsx (server component)
+export default function ProjectsPage() {
+  const projects = await getProjects();
+  return <ProjectList projects={projects} />;
+}
+// ProjectList.tsx (client component for interactivity only)
+"use client";
+export function ProjectList({ projects }) {
+  const [filter, setFilter] = useState('');
+  // ...
+}
+
+// Use Suspense for async components
+<Suspense fallback={<ProjectsSkeleton />}>
+  <ProjectsList />
+</Suspense>
+```
+
+##### Naming Conventions
+```typescript
+// Use lowercase-with-dashes for directories
+src/components/auth-wizard/   // ✅
+src/components/AuthWizard/    // ❌
+
+// Favor named exports for components
+export function ProjectCard() { }   // ✅
+export default ProjectCard;         // ❌ (except for pages)
+
+// Use "function" keyword for pure functions
+function calculateReadingTime(content: string): number { }  // ✅
+const calculateReadingTime = (content: string) => { }      // ❌ For pure functions
+```
+
+#### Pre-Commit Checklist
+```bash
+# Run these before EVERY commit
+pnpm typecheck     # Check TypeScript types
+pnpm build         # Ensure production build works
+pnpm check:write   # Format with Biome
+```
+
 #### Key Files Reference
 - `/src/lib/mock-data.ts` - Data model documentation
 - `/src/app/(dashboard)/layout.tsx` - Main authenticated layout
 - `/src/env.js` - Environment validation
+- `/src/lib/CLAUDE.md` - TypeScript patterns for lib functions
+- `/src/components/CLAUDE.md` - TypeScript patterns for components
 - This file - Development rules and patterns
 
 ### Deployment Checklist
+- [ ] **Run `pnpm typecheck` - no errors**
+- [ ] **Run `pnpm build` - builds successfully**
 - [ ] Environment variables in Vercel
 - [ ] Database URL configured
 - [ ] Clerk keys set
