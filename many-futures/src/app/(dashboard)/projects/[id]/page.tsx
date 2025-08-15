@@ -149,12 +149,13 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
             </span>
             
             {/* Settings Icon */}
-            <button
+            <Link
+              href={`/projects/${id}/settings`}
               className="p-2 rounded-lg hover:bg-stone-50 transition-colors"
               aria-label="Project settings"
             >
               <Settings className="w-5 h-5 text-stone-600" />
-            </button>
+            </Link>
           </div>
         </div>
       </nav>

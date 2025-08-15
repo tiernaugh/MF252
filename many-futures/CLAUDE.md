@@ -48,15 +48,17 @@ User creates project → Futura generates episode → User reads → User gives 
 1. **Conversational UI** - GPT-5 powered project creation
 2. **Episode Generation** - Claude-powered research synthesis  
 3. **Reading Experience** - Beautiful, focused content display
-4. **Feedback Collection** - Simple ratings to improve relevance
-5. **Payment Gate** - £29/month after first episode (this may change - need to create this amount of value first)
+4. **Flexible Scheduling** - Any day combination (daily, weekly, custom)
+5. **Project Settings** - User control over delivery schedule
+6. **Payment Gate** - Single project limit for MVP (pricing TBD based on usage)
 
 ### What We're NOT Building (Yet)
 - ❌ Chat interface (no evidence users want it)
 - ❌ Vector embeddings (expensive, unproven value)
-- ❌ Complex memory layers (over-engineered)
-- ❌ 8 block types (start with 3, expand based on usage)
+- ❌ Memory UI (backend only for MVP)
+- ❌ Multiple projects (single project limit for pricing control)
 - ❌ Team collaboration (single user first)
+- ❌ Frequency restrictions (let users choose any schedule)
 
 ### Critical Safety Features
 - **Cost Controls**: £2 max per episode, £50/day kill switch
@@ -131,9 +133,10 @@ Once we prove that, we can add everything else.
 - [ ] Rate limiting with Upstash
 
 ### Core Features
-- [ ] Project creation flow (conversational UI)
+- [x] Project creation flow (conversational UI)
+- [x] Project settings page (flexible scheduling)
 - [ ] Episode generation system
-- [ ] Reading experience UI
+- [x] Reading experience UI
 - [ ] Feedback collection system
 - [ ] Payment integration (Stripe)
 
@@ -159,6 +162,23 @@ Once we prove that, we can add everything else.
 
 ---
 
+## 🚨 Critical Database Tables (Production Required)
+
+### Must Have for Production
+1. **EpisodeScheduleQueue** - Queue-based scheduling (prevents cascade failures)
+2. **TokenUsageDaily** - Aggregated costs (performance critical)
+3. **PlanningNote** - User feedback loop (Priority 1!)
+4. **UserEvent** - Flexible event tracking (no schema migrations)
+5. **AuditLog** - Compliance and debugging
+
+### Phase 2 Ready (Create Now)
+6. **Block** - Content structure (start with markdown)
+7. **AgentMemory** - Future memory system
+8. **ChatSession/ChatMessage** - Conversation tracking
+9. **Highlight** - User text selections
+
+---
+
 ## Development Rules & Patterns
 
 ### Data Architecture Rules
@@ -176,6 +196,15 @@ Once we prove that, we can add everything else.
 projects.organizationId // Required
 episodes.organizationId // Denormalized for performance
 tokenUsage.organizationId // For billing
+
+// Project scheduling (flexible)
+project.cadenceConfig = {
+  mode: 'weekly' | 'daily' | 'custom',
+  days: [0,1,2,3,4,5,6], // Any combination, 0=Sunday
+}
+
+// User timezone for scheduling
+user.timezone = "Europe/London" // IANA timezone
 
 // Data access pattern
 const data = await db.query.findMany({
@@ -292,11 +321,61 @@ app/
 5. Enforce cost limits
 ```
 
-### Cost Controls
-- **Per Episode**: £2 maximum
+### Critical Production Patterns
+
+#### Queue Processing (MUST USE)
+```typescript
+// Prevent double-processing with row locking
+const pending = await db.$queryRaw`
+  SELECT * FROM episode_schedule_queue 
+  WHERE status = 'pending' 
+  AND scheduled_for <= NOW()
+  FOR UPDATE SKIP LOCKED  -- CRITICAL: Prevents race conditions
+`;
+```
+
+#### Cost Control (MUST USE)
+```typescript
+// Check aggregated table, NOT raw records
+const usage = await db.tokenUsageDaily.findFirst({
+  where: { organizationId, date: today }
+});
+if (usage?.total_cost_gbp >= 50) {
+  // Circuit breaker - block all generation
+}
+```
+
+#### Event Tracking (MUST USE)
+```typescript
+// Use flexible events, NOT boolean flags
+await db.userEvent.create({
+  data: {
+    eventType: 'episode_opened',  // String, not enum
+    eventData: { episodeId, duration }  // Flexible JSON
+  }
+});
+// Derive metrics: SELECT COUNT(*) WHERE eventType = 'episode_opened'
+```
+
+#### Planning Notes (Priority 1)
+```typescript
+// User feedback is CORE to value prop
+await db.planningNote.create({
+  data: {
+    note: userFeedback,  // Max 240 chars
+    status: 'pending',   // Process in next episode
+    scope: 'NEXT_EPISODE'
+  }
+});
+```
+
+### Cost Controls & Pricing Model
+- **MVP Pricing**: Single project limit (any frequency)
+- **Future Pricing**: Project-based tiers (1, 3, unlimited)
+- **Per Episode**: £2 maximum cost control
 - **Daily Limit**: £50 per organization
 - **Tracking**: Every token logged with cost
-- **Enforcement**: Fail gracefully with status update
+- **Learning Mode**: Understand true cost-per-episode at different frequencies
 
 ### Development Workflow
 
@@ -437,5 +516,6 @@ pnpm check:write   # Format with Biome
 
 ---
 
-Last Updated: 2025-08-13
+Last Updated: 2025-08-15
 MVP Version: 0.1
+Key Changes: Flexible scheduling, project-based pricing, no memory UI

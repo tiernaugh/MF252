@@ -15,6 +15,7 @@ export type User = {
   email: string;
   name: string;
   clerkId: string; // Clerk's user_xxx ID for auth integration
+  timezone: string; // IANA timezone e.g., "Europe/London"
   createdAt: Date;
   updatedAt: Date;
 };
@@ -31,7 +32,22 @@ export type Organization = {
   updatedAt: Date;
 };
 
-export type CadenceType = "WEEKLY" | "BIWEEKLY" | "MONTHLY";
+export type CadenceType = "WEEKLY" | "BIWEEKLY" | "MONTHLY"; // Legacy, keeping for backwards compatibility
+
+export type CadenceMode = 'weekly' | 'daily' | 'weekdays' | 'custom';
+
+export type CadenceConfig = {
+  mode: CadenceMode;
+  days: number[]; // [0-6] where 0=Sunday, 1=Monday, etc.
+  // Time is managed server-side (default 9am in user's timezone)
+};
+
+export type ProjectMemory = {
+  id: string;
+  content: string; // The memory statement
+  source: 'onboarding' | 'feedback' | 'interaction' | 'inferred';
+  createdAt: Date;
+};
 
 export type Project = {
   id: string;
@@ -48,7 +64,9 @@ export type Project = {
     };
     turnCount: number; // How many conversation turns to generate brief
   } | null; // Null if project created but not yet onboarded
-  cadenceType: CadenceType;
+  cadenceType: CadenceType; // Legacy field
+  cadenceConfig: CadenceConfig; // New flexible scheduling
+  memories?: ProjectMemory[]; // What the system has learned
   nextScheduledAt: Date | null; // When next episode will generate
   lastPublishedAt: Date | null; // When last episode was published
   isPaused: boolean; // User can pause episode generation
@@ -123,6 +141,7 @@ export const mockUser: User = {
   email: "sarah@designconsultancy.co.uk",
   name: "Sarah Chen",
   clerkId: "user_2kFg9xQpLmN8",
+  timezone: "Europe/London",
   createdAt: new Date("2025-08-01"),
   updatedAt: new Date("2025-08-01"),
 };
@@ -136,6 +155,40 @@ export const mockOrganization: Organization = {
   createdAt: new Date("2025-08-01"),
   updatedAt: new Date("2025-08-01"),
 };
+
+// Sample memories for projects
+const project1Memories: ProjectMemory[] = [
+  {
+    id: "mem_1",
+    content: "Interested in UK regulatory context",
+    source: "onboarding",
+    createdAt: new Date("2025-08-01"),
+  },
+  {
+    id: "mem_2",
+    content: "Engages with contrarian perspectives",
+    source: "feedback",
+    createdAt: new Date("2025-08-05"),
+  },
+  {
+    id: "mem_3",
+    content: "Focus on strategic positioning over tool reviews",
+    source: "interaction",
+    createdAt: new Date("2025-08-08"),
+  },
+  {
+    id: "mem_4",
+    content: "Prefers policy-focused analysis over product reviews",
+    source: "inferred",
+    createdAt: new Date("2025-08-10"),
+  },
+  {
+    id: "mem_5",
+    content: "Values second-order effects on organizational design",
+    source: "feedback",
+    createdAt: new Date("2025-08-12"),
+  },
+];
 
 export const mockProjects: Project[] = [
   // Active project with published episodes - shows full feature set
@@ -160,6 +213,11 @@ export const mockProjects: Project[] = [
       turnCount: 4
     },
     cadenceType: "WEEKLY",
+    cadenceConfig: {
+      mode: 'weekly',
+      days: [2], // Tuesday
+    },
+    memories: project1Memories,
     nextScheduledAt: new Date("2025-08-20"),
     lastPublishedAt: new Date("2025-08-06"),
     isPaused: false,
@@ -188,6 +246,24 @@ export const mockProjects: Project[] = [
       turnCount: 3
     },
     cadenceType: "WEEKLY",
+    cadenceConfig: {
+      mode: 'weekly',
+      days: [4], // Thursday
+    },
+    memories: [
+      {
+        id: "mem_6",
+        content: "Interested in hybrid work models",
+        source: "onboarding",
+        createdAt: new Date("2025-07-15"),
+      },
+      {
+        id: "mem_7",
+        content: "Focuses on team culture and cohesion",
+        source: "feedback",
+        createdAt: new Date("2025-07-20"),
+      },
+    ],
     nextScheduledAt: new Date("2025-08-21"),
     lastPublishedAt: new Date("2025-07-22"),
     isPaused: true,
@@ -203,6 +279,11 @@ export const mockProjects: Project[] = [
     shortSummary: "Sustainability in design",
     onboardingBrief: null, // Not yet onboarded
     cadenceType: "BIWEEKLY",
+    cadenceConfig: {
+      mode: 'weekly',
+      days: [1], // Monday (default)
+    },
+    memories: undefined, // No memories yet
     nextScheduledAt: null, // Can be null because project is paused
     lastPublishedAt: null,
     isPaused: true, // Must be paused if no schedule

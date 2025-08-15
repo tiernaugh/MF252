@@ -1,8 +1,8 @@
 /**
- * Database Schema Documentation - WORKING DOCUMENT
+ * Database Schema Documentation - PRODUCTION READY
  * 
- * STATUS: Draft/Planning - Not yet implemented
- * Last Updated: 2025-08-14
+ * STATUS: Final schema based on expert feedback
+ * Last Updated: 2025-08-15
  * 
  * This file documents the PROPOSED data model for Many Futures.
  * It's based on our current mock data structure but includes
@@ -85,6 +85,7 @@ export interface User {
   clerkId: string;                // Clerk's user ID ✅ IN USE
   email: string;                  // ✅ IN USE
   name: string;                   // ✅ IN USE
+  timezone: string;               // IANA timezone e.g., "Europe/London" ✅ IN USE
   
   // [FUTURE] Additional fields
   imageUrl?: string | null;
@@ -138,6 +139,10 @@ export interface Subscription {
   // Subscription Status
   status: 'TRIAL' | 'ACTIVE' | 'CANCELED' | 'PAST_DUE' | 'INCOMPLETE';
   tier: 'FREE' | 'STARTER' | 'GROWTH' | 'ENTERPRISE';
+  
+  // MVP: Project limits control pricing (not frequency)
+  // STARTER: 1 project, GROWTH: 3 projects, ENTERPRISE: unlimited
+  maxProjects?: number;
   
   // Billing Period
   currentPeriodStart: Date;
@@ -198,7 +203,29 @@ export interface Project {
   } | null;
   
   // Schedule & Status
-  cadenceType: 'WEEKLY' | 'BIWEEKLY' | 'MONTHLY';
+  cadenceType: 'WEEKLY' | 'BIWEEKLY' | 'MONTHLY'; // Legacy field, kept for migration
+  
+  /**
+   * cadenceConfig: Flexible scheduling configuration
+   * ✅ IN USE - Replaces cadenceType for future flexibility
+   */
+  cadenceConfig: {
+    mode: 'weekly' | 'daily' | 'weekdays' | 'custom';
+    days: number[];  // [0-6] where 0=Sunday, 1=Monday, etc.
+    // Time is managed server-side (default 9am in user's timezone)
+  };
+  
+  /**
+   * memories: What the system has learned about user preferences
+   * [FUTURE] Backend structure ready, but no UI in MVP
+   * Will be used for AI context, not shown to users initially
+   */
+  memories?: {
+    id: string;
+    content: string;
+    source: 'onboarding' | 'feedback' | 'interaction' | 'inferred';
+    createdAt: Date;
+  }[];
   
   /**
    * nextScheduledAt: When the next episode will be generated.
@@ -319,6 +346,10 @@ export interface Episode {
    * Calculate: word count / 200 words per minute
    */
   readingMinutes: number;
+  
+  // Generation tracking (added based on expert feedback)
+  generationAttempts?: number;      // Track retry count
+  generationErrors?: string[];      // History of generation failures
   
   // User Engagement
   viewCount: number;                // How many times opened
@@ -467,6 +498,400 @@ export interface UpcomingEpisode {
 }
 
 // ============================================
+// CRITICAL PRODUCTION TABLES (Added based on expert feedback)
+// ============================================
+
+/**
+ * EpisodeScheduleQueue
+ * CRITICAL: Queue-based scheduling for production resilience.
+ * Without this table, any failure (n8n down, rate limits) causes cascade failures.
+ * This is the source of truth for scheduling, not Project.nextScheduledAt.
+ */
+export interface EpisodeScheduleQueue {
+  id: string;                        // queue_[cuid]
+  projectId: string;
+  organizationId: string;
+  
+  // Scheduling
+  scheduledFor: Date;                // When it should run (UTC)
+  pickedUpAt?: Date | null;          // When worker grabbed it
+  completedAt?: Date | null;          // When it finished
+  
+  // Failure handling
+  attemptCount: number;              // For retry logic (max 3)
+  lastError?: string | null;         // What went wrong
+  lastAttemptAt?: Date | null;       // When last tried
+  
+  // Status tracking
+  status: 'pending' | 'processing' | 'completed' | 'failed' | 'cancelled' | 'blocked';
+  
+  // Result tracking
+  episodeId?: string | null;         // If successful, which episode was created
+  
+  // Metadata for debugging
+  metadata?: {
+    userTimezone?: string;           // For debugging scheduling issues
+    userLocalTime?: string;          // What time user expected
+    generationMethod?: string;       // 'scheduled' | 'manual' | 'retry'
+  } | null;
+  
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+/**
+ * TokenUsageDaily
+ * CRITICAL: Aggregated token usage for performance.
+ * Without this, checking daily limits requires scanning all token_usage records.
+ * Updated via PostgreSQL trigger on every token_usage insert.
+ */
+export interface TokenUsageDaily {
+  // Composite primary key: (organizationId, date)
+  organizationId: string;
+  date: Date;                        // Date only, no time
+  
+  // Aggregated metrics
+  totalTokens: number;
+  totalCostGBP: number;              // In GBP for UK market
+  episodeCount: number;              // How many episodes generated
+  
+  // Breakdown by operation for cost analysis
+  operationBreakdown?: {
+    episode_generation: { tokens: number; cost: number; count: number };
+    project_onboarding: { tokens: number; cost: number; count: number };
+    chat: { tokens: number; cost: number; count: number };
+    feedback_analysis: { tokens: number; cost: number; count: number };
+  } | null;
+  
+  // Peak usage tracking (for burst detection)
+  hourlyPeak?: number;               // Highest cost in single hour
+  peakHour?: number;                 // Which hour (0-23)
+  
+  lastUpdated: Date;                 // When trigger last ran
+}
+
+/**
+ * PlanningNote
+ * CRITICAL: User feedback loop for Two-Loop Architecture.
+ * Captures user intent/requests between episodes.
+ * This is Priority 1 - core to our value proposition!
+ */
+export interface PlanningNote {
+  id: string;                        // note_[cuid]
+  projectId: string;
+  organizationId: string;
+  userId: string;
+  episodeId?: string | null;         // Which episode triggered this note
+  
+  // The note itself
+  note: string;                      // Max 240 chars (Twitter-length)
+  
+  // Categorization for AI processing
+  scope: 'NEXT_EPISODE' |            // Specific to next episode
+         'GENERAL_FEEDBACK' |        // Overall direction
+         'TOPIC_REQUEST' |           // Specific topic to explore
+         'DEPTH_ADJUSTMENT';         // More/less detail preference
+  
+  // Processing status
+  status: 'pending' |                // Not yet processed
+          'acknowledged' |           // AI has seen it
+          'incorporated' |           // Used in episode generation
+          'deferred' |              // Saved for later
+          'archived';               // No longer relevant
+  
+  // AI processing metadata
+  processedAt?: Date | null;         // When AI incorporated this
+  processedByEpisodeId?: string | null; // Which episode used this
+  aiInterpretation?: string | null;  // How AI understood the note
+  
+  // Priority for processing
+  priority?: 'LOW' | 'MEDIUM' | 'HIGH';
+  userUpvoted?: boolean;             // User emphasized this
+  
+  // Auto-management
+  archiveAfterEpisodes?: number;     // Auto-archive after N episodes
+  expiresAt?: Date | null;           // Time-based expiry
+  
+  // Metadata
+  createdAt: Date;
+  consumedAt?: Date | null;           // When used by Editorial Loop
+}
+
+/**
+ * AgentMemory
+ * Future-proof memory system. Create now to avoid migration later.
+ * Initially empty, will migrate from Project.memories when >50 memories.
+ */
+export interface AgentMemory {
+  id: string;                        // mem_[cuid]
+  projectId: string;
+  organizationId: string;
+  
+  // Memory content
+  content: string;                   // Natural language memory
+  memoryType: 'preference' |        // User preferences
+              'feedback' |           // Derived from feedback
+              'pattern' |            // Observed patterns
+              'context';            // Domain context
+  
+  // Retrieval and ranking
+  importance: number;                // 0-1, for ranking
+  confidence?: number;               // 0-1, AI's confidence
+  lastAccessed?: Date | null;       // For decay/cleanup
+  accessCount?: number;              // Usage tracking
+  
+  // Source tracking
+  source?: 'onboarding' |           // From initial conversation
+           'feedback' |             // From episode feedback
+           'planning_note' |        // From user planning notes
+           'inferred';              // AI inferred
+  sourceId?: string | null;         // ID of source entity
+  
+  // Memory management
+  expiresAt?: Date | null;          // Auto-cleanup
+  isActive: boolean;                // Can be deactivated
+  
+  // For future vector search
+  embeddingId?: string | null;      // Link to vector embedding
+  
+  // Metadata
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+/**
+ * UserEvent
+ * Flexible event tracking system. Replaces boolean flags.
+ * Allows tracking any user behavior without schema changes.
+ */
+export interface UserEvent {
+  id: string;                        // event_[cuid]
+  userId: string;
+  organizationId: string;
+  
+  // Flexible event system
+  eventType: string;                 // 'onboarding_complete', 'first_episode_opened', etc.
+  eventData?: any;                   // JSON context (OK to be flexible here)
+  
+  // Event metadata
+  sessionId?: string | null;         // Group events by session
+  deviceType?: string | null;        // 'desktop', 'mobile', 'tablet'
+  
+  // For funnel analysis
+  sequenceNumber?: number;           // Order within session
+  timeToNext?: number | null;        // Milliseconds to next event
+  
+  createdAt: Date;
+  
+  // Indexes needed: (userId, eventType), (organizationId, createdAt)
+}
+
+/**
+ * AuditLog
+ * Simple audit trail for compliance and debugging.
+ * Track important actions and changes.
+ */
+export interface AuditLog {
+  id: string;                        // audit_[cuid]
+  userId: string;
+  organizationId: string;
+  
+  // What happened
+  action: string;                    // 'episode.generate', 'project.delete', 'settings.update'
+  resourceType?: string | null;      // 'episode', 'project', 'user'
+  resourceId?: string | null;        // ID of affected resource
+  
+  // Change tracking (simple strings, not JSON)
+  oldValue?: string | null;          // Previous value (stringified)
+  newValue?: string | null;          // New value (stringified)
+  
+  // Additional context
+  ipAddress?: string | null;         // For security tracking
+  userAgent?: string | null;         // Browser/client info
+  
+  // Result
+  success: boolean;                  // Did action succeed?
+  errorMessage?: string | null;      // If failed, why?
+  
+  createdAt: Date;
+  
+  // Indexes: (organizationId, action), (userId, createdAt)
+}
+
+/**
+ * Block
+ * Content structure within episodes. Start simple, evolve complex.
+ * MVP: One markdown block per episode. Future: Semantic blocks.
+ */
+export interface Block {
+  id: string;                        // blk_[cuid]
+  episodeId: string;
+  organizationId: string;            // Denormalized for performance
+  projectId: string;                 // Denormalized for queries
+  
+  // Content structure (start simple)
+  type: 'MARKDOWN' |                 // MVP: Full episode as one block
+        'COLD_OPEN' |                // Future: Intro paragraph
+        'SIGNAL' |                   // Future: Market signal
+        'PATTERN' |                  // Future: Emerging pattern
+        'SCENARIO' |                 // Future: Future scenario
+        'QUESTION';                  // Future: Strategic question
+  
+  content: string;                   // Markdown content (not JSON!)
+  position: number;                  // Order within episode (10, 20, 30...)
+  
+  // Structured metadata (queryable, not JSON blobs)
+  reasoning?: string | null;         // AI's reasoning (plain text)
+  confidence?: number | null;        // 0-1 confidence score
+  
+  // Citations (structured, not JSON)
+  citations?: Array<{
+    url: string;
+    title: string;
+    relevance: number;               // 0-1 relevance score
+    excerpt?: string;
+  }> | null;
+  
+  // Text metrics
+  wordCount?: number;                // For reading time
+  readingSeconds?: number;           // Estimated read time
+  
+  // Engagement tracking
+  highlightCount?: number;           // How many highlights
+  feedbackCount?: number;            // How many feedback items
+  
+  // Metadata
+  createdAt: Date;
+  updatedAt: Date;
+  version: number;                   // For edits/regeneration
+  
+  // Soft delete
+  deletedAt?: Date | null;
+  deletedBy?: string | null;
+}
+
+/**
+ * ChatSession
+ * Container for conversations. Required for Phase 2 chat feature.
+ * Create now to prevent migration later.
+ */
+export interface ChatSession {
+  id: string;                        // chat_[cuid]
+  userId: string;
+  organizationId: string;
+  projectId: string;
+  episodeId?: string | null;         // Optional: might be project-level
+  
+  // Context tracking
+  highlightIds: string[];            // Highlights in this conversation
+  blockIds: string[];                // Blocks discussed
+  planningNoteIds?: string[];        // Planning notes referenced
+  
+  // Session metadata
+  title?: string | null;             // Auto-generated or user-provided
+  summary?: string | null;           // AI-generated summary
+  
+  // Memory integration (future)
+  mem0SessionId?: string | null;     // Mem0 session tracking
+  contextTokenBudget?: number;       // Max tokens for context
+  
+  // Timing
+  startedAt: Date;
+  endedAt?: Date | null;
+  lastMessageAt?: Date | null;
+  
+  // Counters
+  isActive: boolean;
+  messageCount: number;              // Counter cache
+  totalTokens: number;               // Running total
+  totalCostGBP: number;              // Running cost
+  
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+/**
+ * ChatMessage
+ * Individual messages within a chat session.
+ * Tracks costs and extracts insights for memory system.
+ */
+export interface ChatMessage {
+  id: string;                        // msg_[cuid]
+  sessionId: string;
+  
+  // Message content
+  role: 'USER' | 'ASSISTANT' | 'SYSTEM';
+  content: string;
+  
+  // Cost tracking (critical for Phase 2)
+  provider?: 'OPENAI' | 'ANTHROPIC' | 'GOOGLE' | null;
+  model?: string | null;             // 'gpt-4', 'claude-3-sonnet'
+  promptTokens?: number | null;
+  completionTokens?: number | null;
+  totalTokens?: number | null;
+  costGBP?: number | null;
+  
+  // Memory extraction
+  extractedInsights?: {
+    userPreferences?: string[];      // What user wants
+    domainInsights?: string[];       // Domain knowledge
+    actionItems?: string[];          // Follow-up tasks
+    sentiment?: string;              // User sentiment
+    intent?: string;                 // User intent
+  } | null;
+  
+  // Context snapshot
+  contextSnapshot?: any;             // What was in context
+  
+  // Metadata
+  createdAt: Date;
+  editedAt?: Date | null;           // If user edits
+  
+  // Streaming support
+  isStreaming?: boolean;
+  streamCompleted?: boolean;
+}
+
+/**
+ * Highlight
+ * User-selected text that triggers conversations.
+ * Core interaction pattern for Phase 2.
+ */
+export interface Highlight {
+  id: string;                        // hl_[cuid]
+  userId: string;
+  organizationId: string;
+  projectId: string;
+  episodeId: string;
+  
+  // Selection details
+  blockId: string;                   // Which block contains highlight
+  selectedText: string;              // The actual highlighted text
+  startOffset: number;               // Character offset in block
+  endOffset: number;                 // Character offset in block
+  
+  // User annotation
+  note?: string | null;              // User's comment
+  color?: string | null;             // Visual differentiation
+  tags?: string[] | null;            // User categories
+  
+  // Analytics
+  addedToChat?: boolean;             // Was discussed in chat?
+  chatSessionIds?: string[];         // Which chats referenced
+  
+  // For future embeddings
+  embeddingId?: string | null;       // Link to vector
+  similarHighlightIds?: string[] | null; // Related highlights
+  
+  // Metadata
+  createdAt: Date;
+  updatedAt: Date;
+  
+  // Soft delete
+  deletedAt?: Date | null;
+}
+
+// ============================================
 // 🚨 CRITICAL SECURITY: ORGANIZATION SCOPING
 // ============================================
 
@@ -509,9 +934,11 @@ export interface UpcomingEpisode {
  *    - Track EVERY token in TokenUsage table
  * 
  * 2. SCHEDULING
- *    - Episodes generate on nextScheduledAt date
- *    - After generation, update nextScheduledAt based on cadenceType
+ *    - Episodes generate on days specified in cadenceConfig.days
+ *    - Users can select any combination of days (flexible scheduling)
+ *    - After generation, calculate next date based on selected days
  *    - If project isPaused, set nextScheduledAt to null
+ *    - No artificial frequency restrictions (MVP uses project limits for pricing)
  * 
  * 3. CONTENT QUALITY
  *    - Episodes MUST have real, verifiable sources
@@ -573,4 +1000,18 @@ export interface UpcomingEpisode {
  *     "Talent strategies in the AI era"
  *   ]
  * }
+ */
+
+/**
+ * Example Cadence Configuration (Flexible Scheduling):
+ * {
+ *   mode: 'custom',           // or 'weekly', 'daily', 'weekdays'
+ *   days: [1, 3, 5]          // Monday, Wednesday, Friday
+ * }
+ * 
+ * Examples:
+ * - Weekly: { mode: 'weekly', days: [2] }         // Every Tuesday
+ * - Weekdays: { mode: 'weekdays', days: [1,2,3,4,5] }  // Mon-Fri
+ * - Daily: { mode: 'daily', days: [0,1,2,3,4,5,6] }    // Every day
+ * - Custom: { mode: 'custom', days: [1,4] }       // Mon & Thu
  */
