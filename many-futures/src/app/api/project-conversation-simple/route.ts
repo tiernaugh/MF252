@@ -21,7 +21,13 @@ const conversationStates = new Map<string, {
 }>();
 
 // Static system prompt - no phases, no complexity
-const FUTURA_PROMPT = `You are Futura, a futures research agent helping someone create a research project.
+const FUTURA_PROMPT = `You are Futura, a futures research agent helping someone create a PROJECT BRIEF for their weekly research episodes.
+
+CRITICAL CONTEXT:
+- Your ONLY job is to help them create a PROJECT BRIEF
+- This brief will guide weekly AI-generated research episodes about their chosen future
+- Do NOT offer other deliverables (trends, scenarios, reports, presentations, etc.)
+- The project brief is the ONLY output of this conversation
 
 Your personality:
 - Warmly curious collaborative explorer
@@ -31,19 +37,21 @@ Your personality:
 
 Your approach:
 1. Understand what future fascinates them
-2. Explore the angles they care about
+2. Explore the angles they care about (scope, timeframe, focus areas)
 3. After 3-5 exchanges when you have enough context, offer: "Ready for me to create your project brief?"
 
-CRITICAL RULE:
-If the user says "generate brief", "create brief", "brief", "ready", or "done" - IMMEDIATELY respond with: "I'll create your project brief now."
-Do NOT ask more questions after they request the brief.
+CRITICAL RULES:
+- NEVER ask what type of deliverable they want
+- NEVER offer alternatives to a project brief
+- If user says "generate brief", "create brief", "brief", "ready", or "done" - IMMEDIATELY respond with: "I'll create your project brief now."
+- The ONLY thing you create is a project brief
 
 Key behaviors:
-- When they say "all of it" or "everything", celebrate the scope and continue
-- When you have enough context (topic, scope, timeframe), offer to create the brief
-- Trust your judgment about timing
+- When they say "all of it" or "everything", celebrate the scope and continue gathering context
+- When you have topic + scope + timeframe, offer to create the project brief
+- Trust your judgment about timing but remember: you're ONLY creating a project brief
 
-Remember: You're helping them articulate their curiosity, not categorizing their interests.`;
+Remember: You're helping them define a research project that will generate weekly episodes, not providing consulting services.`;
 
 // Brief generation prompt - unchanged
 const BRIEF_GENERATION_PROMPT = `Based on the conversation, create a simple research brief about the topic discussed.
@@ -115,35 +123,16 @@ function formatConversationAsString(messages: any[]): string {
     .join('\n\n');
 }
 
-// SIMPLIFIED: Check if user wants to create brief
+// SIMPLIFIED: Check if user wants to create brief (20% solution)
 function shouldGenerateBrief(messages: any[]): boolean {
   if (messages.length < 4) return false; // Need context
   
   const lastUserMessage = extractMessageContent(messages[messages.length - 1]).toLowerCase().trim();
   
-  // Direct request - user explicitly asks for brief
-  if (lastUserMessage.includes('brief') || 
-      lastUserMessage === 'generate' || 
-      lastUserMessage === 'create' ||
-      lastUserMessage === 'ready' ||
-      lastUserMessage === 'done') {
-    return true;
-  }
+  // Simple triggers - if user says any of these after enough context, generate brief
+  const triggers = ['brief', 'yes', 'okay', 'ok', 'all', 'continue', 'generate', 'create', 'ready', 'done', 'go'];
   
-  // Check if Futura recently asked about creating a brief
-  const recentMessages = messages.slice(-4);
-  const futuraAskedAboutBrief = recentMessages.some(m => 
-    m.role === 'assistant' && 
-    extractMessageContent(m).toLowerCase().includes('ready') && 
-    extractMessageContent(m).toLowerCase().includes('brief')
-  );
-  
-  // Simple confirmation after Futura asks
-  if (futuraAskedAboutBrief && /^(yes|yeah|yep|sure|ok|okay|go|please|sounds good|let's do it)/i.test(lastUserMessage)) {
-    return true;
-  }
-  
-  return false;
+  return triggers.some(trigger => lastUserMessage === trigger || lastUserMessage.includes(trigger));
 }
 
 export async function POST(request: NextRequest) {
@@ -294,17 +283,54 @@ export async function POST(request: NextRequest) {
               console.log('GPT-5 conversation successful');
               const responseText = response.output_text || '';
               
-              // Store response ID for next turn
-              state.previousResponseId = response.id;
-              conversationStates.set(conversationId, state);
-              
-              // Stream the response in chunks
-              const chunkSize = 20;
-              for (let i = 0; i < responseText.length; i += chunkSize) {
-                const chunk = responseText.slice(i, i + chunkSize);
-                controller.enqueue(encoder.encode(chunk));
-                // Add small delay to simulate streaming
-                await new Promise(resolve => setTimeout(resolve, 10));
+              // Check if GPT-5 says it will create the brief
+              if (responseText.toLowerCase().includes("i'll create your project brief")) {
+                console.log('GPT-5 indicated brief creation - generating brief immediately');
+                
+                // Stream the response first
+                for (let i = 0; i < responseText.length; i += 20) {
+                  controller.enqueue(encoder.encode(responseText.slice(i, i + 20)));
+                  await new Promise(resolve => setTimeout(resolve, 10));
+                }
+                
+                // Then immediately generate the brief
+                const conversationString = formatConversationAsString(messages);
+                const briefPrompt = BRIEF_GENERATION_PROMPT.replace('{CONVERSATION}', conversationString);
+                
+                // Generate brief with GPT-5
+                const briefResponse = await (openaiClient as any).responses.create({
+                  model: 'gpt-5-mini',
+                  input: messages.map((m: any) => ({
+                    role: m.role,
+                    content: extractMessageContent(m)
+                  })),
+                  instructions: briefPrompt,
+                  reasoning: { effort: 'low' },
+                  text: { verbosity: 'medium' }
+                });
+                
+                const briefText = briefResponse.output_text || '';
+                const titleMatch = briefText.match(/^(.+)$/m);
+                const brief = {
+                  title: titleMatch ? titleMatch[1]?.trim() ?? 'Future Research Project' : 'Future Research Project',
+                  brief: briefText
+                };
+                
+                // Send brief generation signal
+                controller.enqueue(encoder.encode(`\nBRIEF_GENERATION:${JSON.stringify(brief)}\n`));
+              } else {
+                // Store response ID for next turn
+                state.previousResponseId = response.id;
+                conversationStates.set(conversationId, state);
+                
+                // Stream the response in chunks
+                const chunkSize = 20;
+                for (let i = 0; i < responseText.length; i += chunkSize) {
+                  const chunk = responseText.slice(i, i + chunkSize);
+                  controller.enqueue(encoder.encode(chunk));
+                  // Add small delay to simulate streaming
+                  await new Promise(resolve => setTimeout(resolve, 10));
+                }
               }
               
             } catch (error: any) {

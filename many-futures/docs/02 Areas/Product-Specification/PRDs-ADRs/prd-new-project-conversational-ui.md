@@ -39,6 +39,8 @@ Users need to articulate what futures they want to explore but may:
 4. **Brief Generation** - Futura creates editable document
 5. **Confirmation** - User edits and confirms, project created
 
+**CRITICAL REQUIREMENT**: Futura must ONLY create project briefs. Never offer alternative deliverables (trends, scenarios, reports, etc.). The sole purpose is creating a brief that will guide weekly episode generation.
+
 ### UI Requirements
 
 - Dedicated page (`/projects/new`), not modal
@@ -97,6 +99,8 @@ Users need to articulate what futures they want to explore but may:
 - Asking clarifying questions after user confirms
 - Consultant-speak and formal categorizations
 - Management language and business terminology
+- **Offering alternative deliverables** (ONLY create project briefs)
+- **Asking what type of output they want** (it's always a project brief)
 
 ## Example Conversations
 
