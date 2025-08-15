@@ -272,3 +272,73 @@ The advisor was right: perfectionism was preventing shipping. The complex system
 3. Add basic authentication with Clerk
 4. Implement minimal token tracking
 5. Get first real users testing the system
+
+---
+
+## Day 8 Continued - Making It Actually Work
+
+### The Brief Generation Bug
+After simplifying, discovered the system wasn't actually generating briefs when users requested them. The flow would get stuck with Futura saying "I'll create your project brief now" repeatedly without actually creating it.
+
+### Root Cause Analysis
+The disconnect between:
+- What Futura says: "I'll create your project brief now"
+- What triggers generation: Complex pattern matching
+- What users do: Reply with "okay" or "continue"
+- Result: Infinite loop of promises without action
+
+### The 20% Fix
+Applied simplification principles again:
+1. **Simple triggers**: Any of these words after context = generate brief
+   - "brief", "yes", "okay", "ok", "all", "continue", "generate", "create", "ready", "done", "go"
+2. **Auto-detection**: When GPT-5 says "I'll create your project brief", immediately generate it
+3. **No waiting**: Don't wait for user confirmation after Futura commits
+
+### The Single Purpose Problem
+Discovered Futura was asking users what type of deliverable they wanted (trends, scenarios, reports) instead of focusing solely on project briefs.
+
+**The Issue**: 
+- User describes future interest
+- Futura asks "What deliverable: brief, trends, or scenarios?"
+- But the ONLY purpose is creating project briefs for weekly episodes
+
+**The Fix**:
+- Updated system prompt with CRITICAL CONTEXT
+- Made it explicit: ONLY create project briefs
+- Never ask about deliverable types
+- This brief guides weekly AI research episodes
+
+### Implementation Details
+```typescript
+// Simplified brief detection - just 5 lines
+function shouldGenerateBrief(messages: any[]): boolean {
+  if (messages.length < 4) return false;
+  const lastMsg = extractMessageContent(messages[messages.length - 1]).toLowerCase().trim();
+  const triggers = ['brief', 'yes', 'okay', 'ok', 'all', 'continue', 'generate', 'create', 'ready', 'done', 'go'];
+  return triggers.some(trigger => lastMsg === trigger || lastMsg.includes(trigger));
+}
+```
+
+### Key Learnings
+1. **Trust the model**: GPT-5 knows when to create a brief - listen to what it says
+2. **Single purpose**: Don't let scope creep turn project creation into general consulting
+3. **Simple triggers**: Common affirmative words should just work
+4. **Ship and learn**: These issues only surfaced through actual testing
+
+### Progress Metrics
+- **Days Elapsed**: 8 of 14
+- **Completion**: ~70% of MVP features
+- **Brief Generation**: Finally working reliably
+- **Code Quality**: Continuously improving through simplification
+- **Confidence**: Very high - system does what it should, nothing more
+
+### The Wisdom Revisited
+> "We're using complexity as a security blanket. Every edge case we handle, every state we track, every condition we add - it makes us feel in control. But we're actually making the system more brittle and harder to maintain."
+
+This principle guided today's fixes. Instead of adding more detection logic, we simplified. Instead of complex state management, we trust GPT-5. The result: a system that actually works.
+
+### Next Immediate Steps
+1. Deploy the working simplified version
+2. Test with real users to find actual (not imagined) issues
+3. Begin database integration for persistence
+4. Add authentication for user accounts
