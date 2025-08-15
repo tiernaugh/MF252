@@ -35,71 +35,106 @@ Transform the Many Futures prototype (currently using mock data) into a producti
 
 ## 🔄 n8n Integration Architecture
 
-### The Challenge
-Episode generation via n8n can take 2-5 minutes:
-1. Research Agent: Gathers facts (30-60s)
-2. Writer Agent: Creates content (60-90s)
-3. QA Agent: Validates output (30-60s)
-4. Total: 2-5 minutes typical
+### Subscription Model
+Many Futures is a **subscription service** where episodes are generated and delivered on a schedule:
+- Users set their preferred delivery time (e.g., "Every Monday at 9am")
+- Episodes are pre-generated 2 hours before delivery time
+- Failed generations are retried but won't delay the schedule
+- Next episode always arrives on time, even if previous failed
+
+### Generation Timeline
+1. **T-2 hours**: Start generation (e.g., 7am for 9am delivery)
+2. **T-1:45**: First retry if failed
+3. **T-1:15**: Second retry if needed
+4. **T-0:30**: Final retry attempt
+5. **T-0**: Delivery time (email notification if successful)
 
 ### User Experience Strategy
 
-#### Immediate Feedback (0-5 seconds)
+#### Subscription Delivery Model
 ```typescript
-// When user triggers generation
-await db.episode.create({
-  status: 'DRAFT',
-  projectId,
-  organizationId,
-  title: 'Generating your episode...',
-  scheduledFor: new Date()
-});
+// Episodes are pre-generated based on schedule
+interface ProjectSchedule {
+  cadenceConfig: {
+    mode: 'daily' | 'weekly' | 'custom';
+    days: number[];        // [0-6] where 0=Sunday
+    deliveryHour: number;   // 0-23 in user's timezone
+  };
+  timezone: string;         // User's IANA timezone
+  nextScheduledAt: Date;    // Next delivery time in UTC
+}
 
-// Show immediate UI feedback
-<Card>
-  <Spinner />
-  <h3>Creating your strategic intelligence brief</h3>
-  <p>Futura is researching across multiple sources...</p>
-  <ProgressSteps current={1} total={3} />
+// Show next delivery on project page
+<Card className="bg-stone-50 border-stone-200">
+  <Clock className="w-4 h-4" />
+  <p>Your next episode arrives:</p>
+  <p className="font-serif text-xl">
+    {format(nextScheduledAt, 'EEEE, MMMM d at h:mm a')}
+  </p>
 </Card>
 ```
 
-#### Progress Updates (Every 30s)
+#### Pre-Generation Queue Processing
 ```typescript
-// Poll for status updates
-const pollInterval = setInterval(async () => {
-  const episode = await fetch(`/api/episodes/${id}/status`);
+// Cron job runs every 5 minutes
+export async function processGenerationQueue() {
+  // Find episodes that need generation (2 hours before delivery)
+  const now = new Date();
+  const twoHoursFromNow = new Date(now.getTime() + 2 * 60 * 60 * 1000);
   
-  if (episode.status === 'GENERATING') {
-    // Update progress indicator
-    updateProgress(episode.generationProgress);
-  } else if (episode.status === 'PUBLISHED') {
-    clearInterval(pollInterval);
-    router.push(`/episodes/${id}`);
-  } else if (episode.status === 'FAILED') {
-    clearInterval(pollInterval);
-    showError(episode.generationErrors);
+  const { data: pending } = await supabase
+    .from('episode_schedule_queue')
+    .select('*')
+    .eq('status', 'pending')
+    .gte('scheduled_for', now.toISOString())
+    .lte('scheduled_for', twoHoursFromNow.toISOString())
+    .order('scheduled_for', { ascending: true })
+    .limit(10);
+  
+  for (const item of pending) {
+    await triggerGeneration(item.episode_id);
   }
-}, 30000);
+}
 ```
 
-#### Async Notification Options
-1. **Email notification** when complete
-2. **In-app notification** (bell icon)
-3. **Progressive enhancement**: Start reading while still generating
+#### Delivery Notification
+```typescript
+// Email sent at scheduled delivery time
+export async function sendEpisodeNotification(episodeId: string) {
+  const episode = await getEpisode(episodeId);
+  
+  if (episode.status !== 'PUBLISHED') {
+    // Don't send notification for failed episodes
+    return;
+  }
+  
+  await sendEmail({
+    to: user.email,
+    subject: `Your ${episode.title} intelligence brief is ready`,
+    template: 'episode-ready',
+    data: {
+      episodeUrl: `${BASE_URL}/episodes/${episodeId}`,
+      title: episode.title,
+      readingTime: episode.reading_minutes
+    }
+  });
+}
+```
 
-### n8n Webhook Flow
+### n8n Webhook Flow (Subscription Model)
 
 ```mermaid
 sequenceDiagram
-    participant UI as Next.js App
+    participant Cron as Cron Job
     participant DB as Supabase
     participant Queue as Schedule Queue
     participant n8n as n8n Workflow
     participant AI as AI Agents
+    participant Email as Email Service
 
-    UI->>DB: Create DRAFT episode
-    UI->>Queue: Add to generation queue
+    Cron->>DB: Check for episodes due in 2 hours
+    DB-->>Cron: Episodes needing generation
+    Cron->>Queue: Add to generation queue
     Queue->>n8n: Trigger webhook with episode ID
     n8n->>AI: Research Agent
     AI-->>n8n: Facts & sources
@@ -109,7 +144,8 @@ sequenceDiagram
     AI-->>n8n: Validated content
     n8n->>DB: Update episode (PUBLISHED)
     n8n->>DB: Log token usage
-    DB-->>UI: Episode ready notification
+    Note over Email: Wait until delivery time
+    Email->>User: Episode ready notification
 ```
 
 ## 📁 Implementation Phases
@@ -196,35 +232,72 @@ export async function POST(request: Request) {
 }
 ```
 
-#### 2.2 Episode Generation
+#### 2.2 Queue Processing (Cron Job)
 ```typescript
-// app/api/episodes/generate/route.ts
-export async function POST(request: Request) {
-  const { episodeId } = await request.json();
+// app/api/cron/process-queue/route.ts
+export async function GET(request: Request) {
+  // Verify cron secret
+  const authHeader = request.headers.get('authorization');
+  if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
+    return new Response('Unauthorized', { status: 401 });
+  }
   
-  // Update status
-  await supabase.from('episodes')
-    .update({ status: 'GENERATING', generation_attempts: 1 })
-    .eq('id', episodeId);
+  // Find episodes due for generation (2 hours before delivery)
+  const now = new Date();
+  const twoHoursLater = new Date(now.getTime() + 2 * 60 * 60 * 1000);
   
-  // Add to queue
-  await supabase.from('episode_schedule_queue').insert({
-    episode_id: episodeId,
-    status: 'pending',
-    scheduled_for: new Date()
+  const { data: dueEpisodes } = await supabase
+    .from('episodes')
+    .select('*, project:projects(*)')
+    .eq('status', 'DRAFT')
+    .gte('scheduled_for', now.toISOString())
+    .lte('scheduled_for', twoHoursLater.toISOString())
+    .limit(20); // Process max 20 at a time
+  
+  const triggered = [];
+  
+  for (const episode of dueEpisodes || []) {
+    try {
+      // Check daily cost limit
+      if (!await checkDailyLimit(episode.organization_id)) {
+        await markEpisodeFailed(episode.id, 'Daily cost limit exceeded');
+        continue;
+      }
+      
+      // Update status
+      await supabase.from('episodes')
+        .update({ 
+          status: 'GENERATING',
+          generation_started_at: now
+        })
+        .eq('id', episode.id);
+      
+      // Trigger n8n
+      await fetch(process.env.N8N_WEBHOOK_URL!, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-API-Key': process.env.N8N_API_KEY!
+        },
+        body: JSON.stringify({
+          episodeId: episode.id,
+          projectContext: episode.project,
+          callbackUrl: `${process.env.NEXT_PUBLIC_URL}/api/episodes/callback`
+        })
+      });
+      
+      triggered.push(episode.id);
+      
+    } catch (error) {
+      console.error(`Failed to trigger generation for ${episode.id}:`, error);
+      await trackEvent('generation_trigger_failed', { episodeId: episode.id, error });
+    }
+  }
+  
+  return Response.json({ 
+    processed: triggered.length,
+    episodes: triggered 
   });
-  
-  // Trigger n8n webhook (async - don't await)
-  fetch(process.env.N8N_WEBHOOK_URL!, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ 
-      episodeId,
-      callbackUrl: `${process.env.NEXT_PUBLIC_URL}/api/episodes/callback`
-    })
-  }).catch(console.error);
-  
-  return Response.json({ status: 'generation_started' });
 }
 ```
 

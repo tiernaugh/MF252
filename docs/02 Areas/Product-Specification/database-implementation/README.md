@@ -6,11 +6,12 @@
 
 ## 🎯 Current Objective
 
-Transform the working prototype into a production application with:
+Transform the working prototype into a **subscription-based intelligence service**:
 1. **Supabase database** with all 9 critical tables
 2. **Clerk authentication** with organization context
-3. **n8n integration** for async episode generation (2-5 min)
-4. **Production patterns** (queue processing, cost controls, event tracking)
+3. **Subscription delivery model** - episodes generated 2 hours before scheduled time
+4. **n8n integration** for async episode generation
+5. **Production patterns** (queue processing, retry logic, cost controls)
 
 ## 📊 Implementation Status
 
@@ -68,8 +69,8 @@ Transform the working prototype into a production application with:
 1. ⏳ Create Supabase project & tables
 2. ⏳ Generate TypeScript types
 3. ⏳ Build database client wrapper
-4. ⏳ Implement project/episode CRUD APIs
-5. ⏳ Create n8n webhook endpoints
+4. ⏳ Implement cron job for queue processing (every 5 min)
+5. ⏳ Create n8n webhook endpoints (progress/complete/error)
 
 ### 📋 Day 2: Auth & Integration (Planned)
 1. ⏳ Set up Clerk authentication
@@ -107,24 +108,25 @@ Transform the working prototype into a production application with:
 ### Key Patterns
 
 ```typescript
-// Every table needs organizationId
-interface AnyTable {
-  id: string;
-  organizationId: string;
-  // ...
+// Subscription scheduling
+interface ProjectSchedule {
+  cadenceConfig: {
+    mode: 'daily' | 'weekly' | 'custom';
+    days: number[];        // [0-6] where 0=Sunday
+    deliveryHour: number;   // 0-23 in user's timezone
+  };
+  timezone: string;         // User's IANA timezone
+  nextScheduledAt: Date;    // Next delivery in UTC
 }
 
-// Soft delete pattern
-interface SoftDeletable {
-  deletedAt?: Date | null;
-  deletedBy?: string | null;
-}
-
-// Event tracking pattern
-interface UserEvent {
-  eventType: string;  // Flexible
-  eventData?: any;    // Context
-}
+// Episode generation timeline
+const timeline = {
+  'T-2:00': 'Start generation',
+  'T-1:45': 'First retry if failed',
+  'T-1:15': 'Second retry',
+  'T-0:30': 'Final retry',
+  'T-0:00': 'Delivery time'
+};
 ```
 
 ### Queue Processing
@@ -160,7 +162,8 @@ if (usage?.total_cost_gbp >= 50) {
 
 ### Implementation Guides
 - **[Implementation Plan](./implementation-plan.md)** - Complete roadmap from prototype to production
-- **[n8n Integration Patterns](./n8n-integration-patterns.md)** - Async episode generation UX patterns
+- **[Subscription Delivery Model](./subscription-delivery-model.md)** - How episodes are scheduled and delivered at scale
+- **[n8n Integration Patterns](./n8n-integration-patterns.md)** - Webhook integration and retry strategies
 
 ## 📞 Contact Points
 

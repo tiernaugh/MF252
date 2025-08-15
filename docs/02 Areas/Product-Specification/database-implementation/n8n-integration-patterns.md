@@ -4,22 +4,27 @@
 **Status:** 🟢 Architecture Defined  
 **Context:** Async episode generation with user feedback
 
-## 🎯 The Challenge
+## 🎯 The Subscription Model
 
-Episode generation is computationally expensive and time-consuming:
-- **Research Agent**: 30-60 seconds (web searches, fact gathering)
-- **Writer Agent**: 60-90 seconds (content synthesis, narrative)
-- **QA Agent**: 30-60 seconds (fact checking, guardrails)
-- **Total Time**: 2-5 minutes typical, up to 10 minutes worst case
+Many Futures operates as a **subscription intelligence service**:
+- Episodes are delivered on a user-defined schedule (e.g., "Every Monday at 9am")
+- Generation happens 2 hours before delivery time to ensure freshness
+- Users receive email notifications when episodes are ready
+- Failed generations don't delay the schedule - we skip and continue
 
-Users won't wait at a loading screen for 5 minutes. We need sophisticated async patterns.
+### Generation Timeline
+- **T-2:00**: Start generation (e.g., 7am for 9am delivery)
+- **T-1:45**: First retry if failed (15 min after)
+- **T-1:15**: Second retry if needed (30 min after)
+- **T-0:30**: Final retry attempt (45 min after)
+- **T-0:00**: Delivery time - send notification if successful
 
 ## 🏗️ Architecture Overview
 
 ```
 ┌─────────────┐     ┌──────────┐     ┌─────────────┐
-│   Next.js   │────▶│ Supabase │────▶│    n8n      │
-│     App     │     │    DB    │     │  Workflow   │
+│  Cron Job   │────▶│ Supabase │────▶│    n8n      │
+│ (Every 5min)│     │    DB    │     │  Workflow   │
 └─────────────┘     └──────────┘     └─────────────┘
        │                  │                   │
        │                  │                   ▼
@@ -33,201 +38,278 @@ Users won't wait at a loading screen for 5 minutes. We need sophisticated async 
        │                  ◀───────────────────┘
        │                       (Callback)
        ▼
-┌─────────────┐
-│   User UI   │
-│ (Progress,  │
-│  Polling)   │
-└─────────────┘
+┌─────────────┐     ┌──────────┐
+│Email Service│────▶│   User   │
+│  (At Time)  │     │  Inbox   │
+└─────────────┘     └──────────┘
 ```
 
 ## 📱 User Experience Patterns
 
-### Pattern 1: Immediate Acknowledgment
+### Pattern 1: Schedule Visibility
 ```typescript
-// When user triggers generation
-const handleGenerateEpisode = async () => {
-  // 1. Create draft immediately
-  const episode = await createDraftEpisode({
-    title: "Researching your strategic landscape...",
-    status: 'DRAFT'
-  });
+// Show next delivery time on project page
+const ProjectHeader = ({ project }) => {
+  const nextDelivery = getNextDeliveryTime(
+    project.cadenceConfig,
+    project.timezone
+  );
   
-  // 2. Show progress UI instantly
-  setGenerating(true);
-  setProgress({ stage: 'research', percent: 0 });
-  
-  // 3. Trigger async generation
-  await triggerGeneration(episode.id);
-  
-  // 4. Start polling for updates
-  startPolling(episode.id);
+  return (
+    <Card className="bg-stone-50 border-stone-200 p-4">
+      <div className="flex items-center gap-3">
+        <Clock className="w-5 h-5 text-stone-500" />
+        <div>
+          <p className="text-sm text-stone-600">Next episode arrives:</p>
+          <p className="font-serif text-lg text-stone-900">
+            {format(nextDelivery, 'EEEE, MMMM d')} at {format(nextDelivery, 'h:mm a')}
+          </p>
+        </div>
+      </div>
+    </Card>
+  );
 };
 ```
 
-### Pattern 2: Progressive Status Updates
+### Pattern 2: Failed Generation Messaging
 ```typescript
-interface GenerationProgress {
-  stage: 'queued' | 'research' | 'writing' | 'review' | 'complete';
-  percent: number;
-  message: string;
-  estimatedTimeRemaining?: number; // seconds
+// Show on project page when generation fails
+interface FailedEpisodeAlert {
+  attemptedAt: Date;
+  nextScheduledAt: Date;
+  retryCount: number;
 }
 
-// Progress UI Component
-<Card className="border-2 border-stone-200 p-6">
-  <div className="flex items-center gap-4">
-    <Spinner className="w-8 h-8" />
-    <div className="flex-1">
-      <h3 className="font-serif text-xl">
-        {progress.message}
-      </h3>
-      <ProgressBar value={progress.percent} />
-      <p className="text-sm text-stone-600 mt-2">
-        {progress.stage === 'research' && 'Scanning 50+ sources...'}
-        {progress.stage === 'writing' && 'Crafting your strategic narrative...'}
-        {progress.stage === 'review' && 'Ensuring accuracy and relevance...'}
+// Alert Component for failed generation
+const FailedGenerationAlert = ({ failure }: { failure: FailedEpisodeAlert }) => (
+  <Alert variant="warning" className="mb-6">
+    <AlertCircle className="h-4 w-4" />
+    <AlertTitle>Episode Generation Issue</AlertTitle>
+    <AlertDescription>
+      This week's episode generation encountered an issue. 
+      Your next episode will arrive as scheduled on{' '}
+      <span className="font-medium">
+        {format(failure.nextScheduledAt, 'EEEE, MMMM d at h:mm a')}
+      </span>
+    </AlertDescription>
+  </Alert>
+);
+
+// In episodes list, show failed attempt
+<Card className="opacity-60 border-orange-200 bg-orange-50">
+  <div className="flex items-start justify-between">
+    <div>
+      <Badge variant="destructive" className="mb-2">
+        Generation Failed
+      </Badge>
+      <p className="text-sm text-stone-600">
+        Attempted: {format(failure.attemptedAt, 'PPP')}
       </p>
-      {progress.estimatedTimeRemaining && (
-        <p className="text-xs text-stone-500">
-          About {Math.ceil(progress.estimatedTimeRemaining / 60)} minutes remaining
-        </p>
-      )}
+      <p className="text-xs text-stone-500">
+        {failure.retryCount} retries attempted
+      </p>
     </div>
-  </div>
-  
-  <div className="mt-4 flex gap-2">
-    <Button variant="outline" onClick={navigateAway}>
-      Browse Other Episodes
-    </Button>
-    <Button variant="ghost" onClick={cancelGeneration}>
-      Cancel
-    </Button>
+    <Info className="w-4 h-4 text-stone-400" />
   </div>
 </Card>
 ```
 
-### Pattern 3: Smart Polling with Backoff
+### Pattern 3: Timezone-Aware Scheduling
 ```typescript
-// lib/polling.ts
-export function useEpisodePolling(episodeId: string) {
-  const [status, setStatus] = useState<EpisodeStatus>('DRAFT');
-  const [progress, setProgress] = useState<GenerationProgress>();
-  const intervalRef = useRef<NodeJS.Timeout>();
-  const backoffRef = useRef(5000); // Start at 5 seconds
+// lib/scheduling.ts
+export function calculateNextDelivery(
+  cadenceConfig: CadenceConfig,
+  userTimezone: string
+): Date {
+  const now = new Date();
+  const userTime = toZonedTime(now, userTimezone);
   
-  useEffect(() => {
-    const poll = async () => {
-      try {
-        const data = await fetch(`/api/episodes/${episodeId}/status`);
-        const episode = await data.json();
-        
-        setStatus(episode.status);
-        setProgress(episode.generationProgress);
-        
-        if (episode.status === 'PUBLISHED') {
-          // Success! Stop polling
-          clearInterval(intervalRef.current);
-          router.push(`/episodes/${episodeId}`);
-        } else if (episode.status === 'FAILED') {
-          // Error! Stop polling
-          clearInterval(intervalRef.current);
-          showError(episode.generationErrors[0]);
-        } else {
-          // Still generating, increase backoff
-          backoffRef.current = Math.min(backoffRef.current * 1.5, 30000);
-        }
-      } catch (error) {
-        console.error('Polling error:', error);
+  // Find next matching day and time
+  const deliveryHour = cadenceConfig.deliveryHour || 9; // Default 9am
+  const daysToCheck = 14; // Check up to 2 weeks ahead
+  
+  for (let i = 0; i < daysToCheck; i++) {
+    const checkDate = addDays(userTime, i);
+    const dayOfWeek = getDay(checkDate);
+    
+    if (cadenceConfig.days.includes(dayOfWeek)) {
+      const deliveryTime = setHours(setMinutes(checkDate, 0), deliveryHour);
+      
+      // If today and time hasn't passed, or if future day
+      if (i > 0 || deliveryTime > userTime) {
+        // Convert back to UTC for storage
+        return fromZonedTime(deliveryTime, userTimezone);
       }
-    };
-    
-    // Initial poll
-    poll();
-    
-    // Set up interval with backoff
-    intervalRef.current = setInterval(poll, backoffRef.current);
-    
-    return () => clearInterval(intervalRef.current);
-  }, [episodeId]);
+    }
+  }
   
-  return { status, progress };
+  throw new Error('No valid delivery date found');
+}
+
+// Calculate generation time (2 hours before delivery)
+export function calculateGenerationTime(deliveryTime: Date): Date {
+  return new Date(deliveryTime.getTime() - 2 * 60 * 60 * 1000);
 }
 ```
 
 ## 🔄 n8n Webhook Implementation
 
-### Webhook Trigger from Next.js
+### Cron Job Queue Processing
 ```typescript
-// app/api/episodes/generate/route.ts
-export async function POST(request: Request) {
-  const { projectId } = await request.json();
-  const { orgId } = await getCurrentOrg();
-  
-  // 1. Check cost limits first
-  if (!await checkDailyLimit(orgId)) {
-    return Response.json(
-      { error: 'Daily generation limit reached' },
-      { status: 429 }
-    );
+// app/api/cron/process-queue/route.ts
+export async function GET(request: Request) {
+  // Verify cron secret (Vercel Cron or similar)
+  const authHeader = request.headers.get('authorization');
+  if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
+    return new Response('Unauthorized', { status: 401 });
   }
   
-  // 2. Create episode draft
-  const episode = await supabase.from('episodes').insert({
-    project_id: projectId,
-    organization_id: orgId,
-    status: 'DRAFT',
-    title: 'Generating episode...',
-    scheduled_for: new Date()
-  }).select().single();
+  // Find episodes due for generation (2 hours before delivery)
+  const now = new Date();
+  const twoHoursLater = new Date(now.getTime() + 2 * 60 * 60 * 1000);
+  const twoHoursEarlier = new Date(now.getTime() - 2 * 60 * 60 * 1000);
   
-  // 3. Add to queue
-  await supabase.from('episode_schedule_queue').insert({
-    episode_id: episode.data.id,
-    project_id: projectId,
-    organization_id: orgId,
-    status: 'pending',
-    scheduled_for: new Date()
-  });
+  // Get episodes that:
+  // 1. Are scheduled for delivery in the next 2 hours
+  // 2. Haven't been generated yet (status = DRAFT)
+  // 3. Haven't failed too many times
+  const { data: dueEpisodes } = await supabase
+    .from('episodes')
+    .select(`
+      *,
+      project:projects(
+        *,
+        planning_notes(*)
+      )
+    `)
+    .eq('status', 'DRAFT')
+    .gte('scheduled_for', now.toISOString())
+    .lte('scheduled_for', twoHoursLater.toISOString())
+    .lt('generation_attempts', 3)
+    .order('scheduled_for', { ascending: true })
+    .limit(20); // Process max 20 at a time to avoid overload
   
-  // 4. Get project context
-  const project = await supabase.from('projects')
-    .select('*, planning_notes(*)')
-    .eq('id', projectId)
-    .single();
+  const results = {
+    triggered: [],
+    failed: [],
+    skipped: []
+  };
   
-  // 5. Trigger n8n webhook (fire and forget)
-  fetch(process.env.N8N_WEBHOOK_URL!, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'X-API-Key': process.env.N8N_API_KEY!
-    },
-    body: JSON.stringify({
-      episodeId: episode.data.id,
-      projectId,
-      organizationId: orgId,
-      context: {
-        brief: project.data.onboarding_brief,
-        memories: project.data.memories,
-        planningNotes: project.data.planning_notes,
-        previousEpisodeId: project.data.last_episode_id
-      },
-      callbacks: {
-        progress: `${process.env.NEXT_PUBLIC_URL}/api/episodes/${episode.data.id}/progress`,
-        complete: `${process.env.NEXT_PUBLIC_URL}/api/episodes/${episode.data.id}/complete`,
-        error: `${process.env.NEXT_PUBLIC_URL}/api/episodes/${episode.data.id}/error`
+  // Process each due episode
+  for (const episode of dueEpisodes || []) {
+    try {
+      // Check organization's daily cost limit
+      if (!await checkDailyLimit(episode.organization_id)) {
+        await markEpisodeFailed(episode.id, 'Daily cost limit exceeded');
+        results.skipped.push({ id: episode.id, reason: 'cost_limit' });
+        continue;
       }
-    })
-  }).catch(error => {
-    // Log but don't fail the request
-    console.error('Failed to trigger n8n:', error);
-    trackEvent('n8n_trigger_failed', { error: error.message });
-  });
+      
+      // Update episode status to generating
+      await supabase.from('episodes')
+        .update({ 
+          status: 'GENERATING',
+          generation_started_at: now,
+          generation_attempts: episode.generation_attempts + 1
+        })
+        .eq('id', episode.id);
+      
+      // Add to processing queue
+      await supabase.from('episode_schedule_queue').insert({
+        episode_id: episode.id,
+        project_id: episode.project_id,
+        organization_id: episode.organization_id,
+        status: 'processing',
+        scheduled_for: episode.scheduled_for,
+        processing_started_at: now
+      });
+      
+      // Prepare context including planning notes
+      const context = {
+        brief: episode.project.onboarding_brief,
+        memories: episode.project.memories || [],
+        planningNotes: episode.project.planning_notes
+          ?.filter(note => note.status === 'pending')
+          ?.map(note => note.note) || [],
+        previousEpisodeId: episode.project.last_episode_id
+      };
+      
+      // Trigger n8n webhook
+      const response = await fetch(process.env.N8N_WEBHOOK_URL!, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-API-Key': process.env.N8N_API_KEY!
+        },
+        body: JSON.stringify({
+          episodeId: episode.id,
+          projectId: episode.project_id,
+          organizationId: episode.organization_id,
+          context,
+          callbacks: {
+            progress: `${process.env.NEXT_PUBLIC_URL}/api/episodes/${episode.id}/progress`,
+            complete: `${process.env.NEXT_PUBLIC_URL}/api/episodes/${episode.id}/complete`,
+            error: `${process.env.NEXT_PUBLIC_URL}/api/episodes/${episode.id}/error`
+          },
+          metadata: {
+            scheduledFor: episode.scheduled_for,
+            attemptNumber: episode.generation_attempts + 1,
+            timezone: episode.project.timezone
+          }
+        })
+      });
+      
+      if (!response.ok) {
+        throw new Error(`n8n returned ${response.status}`);
+      }
+      
+      results.triggered.push(episode.id);
+      
+      // Mark planning notes as acknowledged
+      if (episode.project.planning_notes?.length) {
+        await supabase.from('planning_notes')
+          .update({ 
+            status: 'acknowledged',
+            acknowledged_at: now
+          })
+          .in('id', episode.project.planning_notes.map(n => n.id));
+      }
+      
+    } catch (error) {
+      console.error(`Failed to trigger generation for ${episode.id}:`, error);
+      results.failed.push({ id: episode.id, error: error.message });
+      
+      // Update episode status
+      await supabase.from('episodes')
+        .update({ 
+          status: 'DRAFT', // Reset to draft for retry
+          generation_errors: [
+            ...(episode.generation_errors || []),
+            {
+              timestamp: now.toISOString(),
+              error: error.message,
+              attempt: episode.generation_attempts + 1
+            }
+          ]
+        })
+        .eq('id', episode.id);
+      
+      // Log failure event
+      await trackEvent('generation_trigger_failed', { 
+        episodeId: episode.id, 
+        error: error.message,
+        attempt: episode.generation_attempts + 1
+      });
+    }
+  }
   
-  return Response.json({
-    episodeId: episode.data.id,
-    status: 'generating',
-    estimatedTime: 180 // 3 minutes
+  // Log cron execution
+  await trackEvent('cron_queue_processed', results);
+  
+  return Response.json({ 
+    success: true,
+    timestamp: now.toISOString(),
+    results
   });
 }
 ```
@@ -495,48 +577,119 @@ idle → triggering → generating → completed
 
 ## 🔄 Retry & Recovery Patterns
 
-### Automatic Retry with Exponential Backoff
+### Automatic Retry Strategy
 ```typescript
+// Retry timing for 9am delivery:
+// 7:00am - Initial attempt (2 hours before)
+// 7:15am - First retry (15 min after)
+// 7:45am - Second retry (30 min after first)
+// 8:30am - Final retry (45 min after second)
+// 9:00am - Delivery time (skip if still failed)
+
 async function scheduleRetry(episodeId: string, attemptNumber: number) {
-  const delayMinutes = Math.pow(2, attemptNumber) * 5; // 5, 10, 20 minutes
+  const episode = await getEpisode(episodeId);
+  const deliveryTime = new Date(episode.scheduled_for);
+  const now = new Date();
   
+  // Calculate retry times based on delivery schedule
+  const retrySchedule = [
+    new Date(deliveryTime.getTime() - 105 * 60 * 1000), // 1:45 before
+    new Date(deliveryTime.getTime() - 75 * 60 * 1000),  // 1:15 before
+    new Date(deliveryTime.getTime() - 30 * 60 * 1000),  // 0:30 before
+  ];
+  
+  const nextRetryTime = retrySchedule[attemptNumber - 1];
+  
+  if (!nextRetryTime || nextRetryTime < now) {
+    // No more retries or past retry window
+    await markEpisodeFailed(episodeId, 'Max retries exceeded');
+    return;
+  }
+  
+  // Schedule retry
   await supabase.from('episode_schedule_queue').insert({
     episode_id: episodeId,
     status: 'pending',
-    scheduled_for: new Date(Date.now() + delayMinutes * 60 * 1000),
+    scheduled_for: nextRetryTime,
     retry_attempt: attemptNumber,
     metadata: { auto_retry: true }
   });
   
-  // Notify user of retry
+  // Track retry
   await trackEvent('episode_generation_retry_scheduled', {
     episodeId,
     attemptNumber,
-    delayMinutes
+    retryTime: nextRetryTime,
+    deliveryTime
   });
 }
 ```
 
-### Manual Recovery Options
+### Failed Episode Handling
 ```typescript
-// Admin action to force regenerate
-export async function forceRegenerate(episodeId: string) {
-  // Reset episode
+// When all retries are exhausted
+export async function handleFailedEpisode(episodeId: string) {
+  const episode = await getEpisode(episodeId);
+  
+  // Mark as failed
   await supabase.from('episodes').update({
-    status: 'DRAFT',
-    generation_attempts: 0,
-    generation_errors: [],
-    content: null,
-    sources: null
+    status: 'FAILED',
+    failed_at: new Date()
   }).eq('id', episodeId);
   
-  // Clear old queue entries
+  // Update queue
   await supabase.from('episode_schedule_queue')
-    .delete()
+    .update({ 
+      status: 'failed',
+      failed_at: new Date()
+    })
     .eq('episode_id', episodeId);
   
-  // Trigger fresh generation
-  await triggerGeneration(episodeId);
+  // Schedule next episode (don't let failure break the subscription)
+  const nextDelivery = calculateNextDelivery(
+    episode.project.cadence_config,
+    episode.project.timezone
+  );
+  
+  await supabase.from('episodes').insert({
+    project_id: episode.project_id,
+    organization_id: episode.organization_id,
+    status: 'DRAFT',
+    scheduled_for: nextDelivery,
+    title: 'Upcoming episode'
+  });
+  
+  // Keep planning notes for next episode
+  // (User feedback persists even if generation failed)
+  
+  // Log for founder review
+  await supabase.from('audit_log').insert({
+    action: 'episode_generation_failed',
+    resource_type: 'episode',
+    resource_id: episodeId,
+    details: {
+      attempts: episode.generation_attempts,
+      errors: episode.generation_errors,
+      scheduled_for: episode.scheduled_for
+    },
+    severity: 'high'
+  });
+}
+
+// Admin dashboard query for founder
+export async function getFailedEpisodes() {
+  const { data } = await supabase
+    .from('episodes')
+    .select(`
+      *,
+      project:projects(title, organization_id),
+      queue:episode_schedule_queue(*)
+    `)
+    .eq('status', 'FAILED')
+    .order('failed_at', { ascending: false })
+    .limit(50);
+    
+  return data;
 }
 ```
 
@@ -587,20 +740,152 @@ Sentry.captureException(error, {
 
 ## 🚨 Edge Cases & Considerations
 
-### 1. User Navigates Away
-- Continue generation in background
-- Send email when complete
-- Show notification badge on return
+### 1. Paused Project Handling
+```typescript
+// When project is paused
+export async function pauseProject(projectId: string) {
+  // Cancel any pending episodes
+  await supabase.from('episodes')
+    .update({ status: 'CANCELLED' })
+    .eq('project_id', projectId)
+    .eq('status', 'DRAFT');
+  
+  // Clear from queue
+  await supabase.from('episode_schedule_queue')
+    .delete()
+    .eq('project_id', projectId)
+    .eq('status', 'pending');
+  
+  // Update project
+  await supabase.from('projects').update({
+    is_paused: true,
+    paused_at: new Date(),
+    next_scheduled_at: null
+  }).eq('id', projectId);
+}
 
-### 2. n8n Webhook Timeout
-- Set 10-minute timeout on n8n side
-- If no callback received in 15 minutes, mark as failed
-- Implement dead letter queue for investigation
+// When project is unpaused
+export async function unpauseProject(projectId: string) {
+  const project = await getProject(projectId);
+  
+  // Calculate next delivery from today
+  const nextDelivery = calculateNextDelivery(
+    project.cadence_config,
+    project.timezone
+  );
+  
+  // Create fresh episode (don't use stale content)
+  await supabase.from('episodes').insert({
+    project_id: projectId,
+    organization_id: project.organization_id,
+    status: 'DRAFT',
+    scheduled_for: nextDelivery,
+    title: 'Upcoming episode'
+  });
+  
+  // Update project
+  await supabase.from('projects').update({
+    is_paused: false,
+    paused_at: null,
+    next_scheduled_at: nextDelivery
+  }).eq('id', projectId);
+  
+  return nextDelivery;
+}
+```
 
-### 3. Duplicate Generation Requests
-- Check for existing DRAFT/GENERATING episodes
-- Prevent duplicate triggers within 5 minutes
-- Use idempotency keys
+### 2. Timezone Changes
+```typescript
+// When user changes timezone
+export async function updateUserTimezone(
+  userId: string, 
+  newTimezone: string
+) {
+  // Update user
+  await supabase.from('users').update({
+    timezone: newTimezone
+  }).eq('id', userId);
+  
+  // Recalculate all project schedules
+  const projects = await getUserProjects(userId);
+  
+  for (const project of projects) {
+    // Cancel existing scheduled episodes
+    await supabase.from('episodes')
+      .update({ status: 'CANCELLED' })
+      .eq('project_id', project.id)
+      .eq('status', 'DRAFT');
+    
+    // Calculate new delivery time in new timezone
+    const nextDelivery = calculateNextDelivery(
+      project.cadence_config,
+      newTimezone
+    );
+    
+    // Create new episode with updated schedule
+    await supabase.from('episodes').insert({
+      project_id: project.id,
+      organization_id: project.organization_id,
+      status: 'DRAFT',
+      scheduled_for: nextDelivery
+    });
+    
+    // Update project
+    await supabase.from('projects').update({
+      next_scheduled_at: nextDelivery,
+      timezone: newTimezone
+    }).eq('id', project.id);
+  }
+}
+```
+
+### 3. Cadence Changes
+```typescript
+// When user changes delivery schedule
+export async function updateProjectCadence(
+  projectId: string,
+  newCadence: CadenceConfig
+) {
+  const project = await getProject(projectId);
+  
+  // Cancel current scheduled episode
+  await supabase.from('episodes')
+    .update({ status: 'CANCELLED' })
+    .eq('project_id', projectId)
+    .eq('status', 'DRAFT');
+  
+  // Calculate next delivery with new cadence
+  const nextDelivery = calculateNextDelivery(
+    newCadence,
+    project.timezone
+  );
+  
+  // Create new episode with updated schedule
+  await supabase.from('episodes').insert({
+    project_id: projectId,
+    organization_id: project.organization_id,
+    status: 'DRAFT',
+    scheduled_for: nextDelivery,
+    title: 'Upcoming episode'
+  });
+  
+  // Update project
+  await supabase.from('projects').update({
+    cadence_config: newCadence,
+    next_scheduled_at: nextDelivery
+  }).eq('id', projectId);
+  
+  // Log change
+  await trackEvent('cadence_updated', {
+    projectId,
+    oldCadence: project.cadence_config,
+    newCadence,
+    nextDelivery
+  });
+  
+  return nextDelivery;
+}
+```
 
 ### 4. Cost Explosion
 - Hard limit of £2 per episode
