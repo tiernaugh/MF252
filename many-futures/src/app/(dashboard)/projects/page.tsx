@@ -3,6 +3,9 @@ import { getProjectsByOrg } from "~/server/actions/projects";
 import { getEpisodesByProject } from "~/server/actions/episodes";
 import ProjectsList from "./projects-list";
 
+// Force dynamic rendering - don't try to statically generate at build time
+export const dynamic = 'force-dynamic';
+
 export default async function ProjectsPage() {
   // Fetch real data from database
   const organization = await getCurrentOrganization();

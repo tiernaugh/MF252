@@ -4,6 +4,9 @@ import { getEpisodesByProject } from "~/server/actions/episodes";
 import ProjectDetailClient from "./project-detail-client";
 import type { UpcomingEpisode } from "~/lib/mock-data";
 
+// Force dynamic rendering
+export const dynamic = 'force-dynamic';
+
 export default async function ProjectDetailPage({ 
   params 
 }: { 

@@ -3,6 +3,9 @@ import { revalidatePath } from "next/cache";
 import { getProjectById, updateProjectSettings, pauseProject, resumeProject } from "~/server/actions/projects";
 import SettingsClient from "./settings-client";
 
+// Force dynamic rendering
+export const dynamic = 'force-dynamic';
+
 export default async function ProjectSettingsPage({ 
   params 
 }: { 

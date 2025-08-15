@@ -3,6 +3,9 @@ import { getEpisodeById } from "~/server/actions/episodes";
 import { getProjectById } from "~/server/actions/projects";
 import EpisodeReaderClient from "./episode-reader-client";
 
+// Force dynamic rendering
+export const dynamic = 'force-dynamic';
+
 export default async function EpisodePage({ 
   params 
 }: { 
