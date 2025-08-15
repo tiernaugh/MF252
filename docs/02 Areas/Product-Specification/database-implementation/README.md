@@ -1,16 +1,16 @@
 # Database Implementation Hub
 
 **Last Updated:** 2025-08-15  
-**Status:** 🟡 In Progress  
-**Context:** Post-expert feedback, implementing production-ready schema
+**Status:** 🟡 Schema Complete, Implementation Planned  
+**Context:** Moving from prototype to production with Clerk auth & n8n integration
 
 ## 🎯 Current Objective
 
-Implement the complete database schema based on expert feedback, ensuring:
-1. Production resilience (queue-based scheduling)
-2. Performance optimization (aggregation tables)  
-3. User feedback loop (planning notes)
-4. Future-proof structure (empty tables for Phase 2-3)
+Transform the working prototype into a production application with:
+1. **Supabase database** with all 9 critical tables
+2. **Clerk authentication** with organization context
+3. **n8n integration** for async episode generation (2-5 min)
+4. **Production patterns** (queue processing, cost controls, event tracking)
 
 ## 📊 Implementation Status
 
@@ -56,27 +56,34 @@ Implement the complete database schema based on expert feedback, ensuring:
 - `/src/app/(dashboard)/projects/[id]/settings/page.tsx`
 - `/src/app/(dashboard)/episodes/[id]/page.tsx`
 
-## 🔄 Implementation Order
+## 🔄 Implementation Timeline
 
-### Phase 1: Schema Definition (Current)
-1. ✅ Review and respond to expert feedback
-2. ✅ Update database-schema.ts with all tables
-3. ⏳ Create schema-final.ts for Supabase
+### ✅ Completed (Schema & Mock Data)
+1. Database schema defined with 9 critical tables
+2. Mock data updated and tested
+3. Front-end verified with mock data
+4. Expert feedback incorporated
 
-### Phase 2: Mock Data Update
-1. ✅ Update mock-data.ts types
-2. ✅ Add mock data for new tables
-3. ✅ Ensure data relationships are valid
+### 📋 Day 1: Database & API (Planned)
+1. ⏳ Create Supabase project & tables
+2. ⏳ Generate TypeScript types
+3. ⏳ Build database client wrapper
+4. ⏳ Implement project/episode CRUD APIs
+5. ⏳ Create n8n webhook endpoints
 
-### Phase 3: Front-End Verification
-1. ✅ Test all existing pages
-2. ✅ Fix any TypeScript errors
-3. ✅ Verify mock data displays correctly
+### 📋 Day 2: Auth & Integration (Planned)
+1. ⏳ Set up Clerk authentication
+2. ⏳ Add organization context
+3. ⏳ Connect UI to real database
+4. ⏳ Implement async generation UI
+5. ⏳ Test end-to-end flow
 
-### Phase 4: Documentation
-1. ⏳ Update CLAUDE.md
-2. ⏳ Create ADRs for key decisions
-3. ⏳ Complete migration plan
+### 📋 Day 3: Production Patterns (Planned)
+1. ⏳ Queue processing with row locking
+2. ⏳ Cost control implementation
+3. ⏳ Event tracking system
+4. ⏳ Error recovery mechanisms
+5. ⏳ Deploy to staging
 
 ## 🚨 Critical Decisions Made
 
@@ -143,11 +150,17 @@ if (usage?.total_cost_gbp >= 50) {
 
 ## 🎯 Next Immediate Steps
 
-1. Update `/src/lib/database-schema.ts` with all 9 tables
-2. Update `/src/lib/mock-data.ts` to match
-3. Run `pnpm typecheck` to catch issues
-4. Test all dashboard pages
-5. Create migration plan for Supabase
+1. **Create Supabase project** and run migrations
+2. **Install Clerk** and configure authentication
+3. **Create database client** (`/src/lib/db.ts`)
+4. **Update project creation** to save to database
+5. **Implement n8n webhooks** for episode generation
+
+## 🚀 New Documentation
+
+### Implementation Guides
+- **[Implementation Plan](./implementation-plan.md)** - Complete roadmap from prototype to production
+- **[n8n Integration Patterns](./n8n-integration-patterns.md)** - Async episode generation UX patterns
 
 ## 📞 Contact Points
 
@@ -157,6 +170,12 @@ if (usage?.total_cost_gbp >= 50) {
 
 ## 🔗 Related Documents
 
+### New Implementation Docs
+- **[Implementation Plan](./implementation-plan.md)** - Day-by-day roadmap
+- **[n8n Integration Patterns](./n8n-integration-patterns.md)** - Async generation UX
+- **[Edge Cases to Test](./edge-cases-to-test.md)** - Critical scenarios
+
+### Previous Work
 - [Schema Feedback Response](../PRDs-ADRs/database-schema/schema-feedback-response.md)
 - [Project Settings PRD](../PRDs-ADRs/project-settings/PRD-project-settings.md)
 - [Scheduling Architecture ADR](../PRDs-ADRs/project-settings/ADR-001-scheduling-architecture.md)
@@ -164,4 +183,4 @@ if (usage?.total_cost_gbp >= 50) {
 
 ---
 
-**Remember:** This is our source of truth for database implementation. Keep it updated as we progress!
+**Remember:** This is our source of truth for the production implementation. Keep it updated as we progress!
