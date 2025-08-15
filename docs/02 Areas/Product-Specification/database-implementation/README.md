@@ -161,11 +161,13 @@ if (usage?.total_cost_gbp >= 50) {
 ## 🚀 New Documentation
 
 ### Implementation Guides
+- **🔴 [Critical Setup Requirements](./critical-setup-requirements.md)** - MUST READ: Resolved timing ambiguity & service role setup
+- **[Schema with Rationale](./schema-with-rationale.md)** - Complete database schema with clarified timing fields
 - **[Architectural Decisions](./architectural-decisions.md)** - Key technical decisions and rationale
 - **[Implementation Plan](./implementation-plan.md)** - Complete roadmap from prototype to production
 - **[Subscription Delivery Model](./subscription-delivery-model.md)** - 4-hour generation window, scheduled delivery
 - **[n8n Integration Patterns](./n8n-integration-patterns.md)** - Webhook integration and retry strategies
-- **🔴 [RLS Security Policies](./rls-security-policies.md)** - CRITICAL: Must implement before tables!
+- **[RLS Security Policies](./rls-security-policies.md)** - Must implement with table creation
 
 ## 📞 Contact Points
 

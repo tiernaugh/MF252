@@ -337,9 +337,11 @@ export interface Episode {
     error?: string;                 // If status is FAILED
   } | null;
   
-  // Publishing & Scheduling
-  publishedAt: Date | null;         // When users can read it
-  scheduledFor: Date | null;        // When it should be generated
+  // CRITICAL: Clear timing fields to avoid confusion
+  scheduledFor: Date | null;        // When user expects episode (delivery time, e.g., 9am)
+  generationStartedAt?: Date | null; // When generation actually began (e.g., 5am)
+  publishedAt: Date | null;         // When content ready (e.g., 8:30am)
+  deliveredAt?: Date | null;        // When email notification sent (e.g., 9am)
   
   /**
    * readingMinutes: Estimated read time
@@ -512,8 +514,14 @@ export interface EpisodeScheduleQueue {
   projectId: string;
   organizationId: string;
   
-  // Scheduling
-  scheduledFor: Date;                // When it should run (UTC)
+  // CRITICAL: Clear timing separation to avoid confusion
+  generationStartTime: Date;         // When to START generation (T-4 hours, e.g., 5am UTC)
+  targetDeliveryTime: Date;          // When user expects episode (T-0, e.g., 9am UTC)
+  
+  // Priority for SLA differentiation
+  priority: number;                   // 10=Premium, 8=Retry, 5=Standard, 1=Bulk
+  
+  // Processing timestamps
   pickedUpAt?: Date | null;          // When worker grabbed it
   completedAt?: Date | null;          // When it finished
   
