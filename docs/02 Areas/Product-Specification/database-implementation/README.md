@@ -161,9 +161,11 @@ if (usage?.total_cost_gbp >= 50) {
 ## 🚀 New Documentation
 
 ### Implementation Guides
+- **[Architectural Decisions](./architectural-decisions.md)** - Key technical decisions and rationale
 - **[Implementation Plan](./implementation-plan.md)** - Complete roadmap from prototype to production
-- **[Subscription Delivery Model](./subscription-delivery-model.md)** - How episodes are scheduled and delivered at scale
+- **[Subscription Delivery Model](./subscription-delivery-model.md)** - 4-hour generation window, scheduled delivery
 - **[n8n Integration Patterns](./n8n-integration-patterns.md)** - Webhook integration and retry strategies
+- **🔴 [RLS Security Policies](./rls-security-policies.md)** - CRITICAL: Must implement before tables!
 
 ## 📞 Contact Points
 

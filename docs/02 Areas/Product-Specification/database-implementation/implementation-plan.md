@@ -462,16 +462,17 @@ const handleSave = async () => {
 
 ### Phase 5: Production Patterns (3 hours)
 
-#### 5.1 Queue Processing
+#### 5.1 Queue Processing with Priority
 ```typescript
 // lib/queue.ts
 export async function processEpisodeQueue() {
-  // Get pending episodes with row locking
+  // Get pending episodes with row locking and priority
   const { data: pending } = await supabase.rpc('get_pending_episodes', {
     sql: `
       SELECT * FROM episode_schedule_queue 
       WHERE status = 'pending' 
       AND scheduled_for <= NOW()
+      ORDER BY priority DESC, scheduled_for ASC  -- Higher priority first
       FOR UPDATE SKIP LOCKED
       LIMIT 1
     `
@@ -487,6 +488,14 @@ export async function processEpisodeQueue() {
   } catch (error) {
     await handleQueueError(episode.id, error);
   }
+}
+
+// Priority calculation for queue efficiency
+function calculatePriority(episode: Episode): number {
+  if (episode.subscription_tier === 'premium') return 10;
+  if (episode.subscription_tier === 'trial') return 5;
+  if (episode.generation_attempts > 0) return 8; // Retries get priority
+  return 5; // Default
 }
 ```
 

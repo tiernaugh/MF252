@@ -1,3 +1,4 @@
+
 # Subscription Delivery Model
 
 **Created:** 2025-08-15  
@@ -8,7 +9,7 @@
 
 Many Futures is a **subscription intelligence service**, not an on-demand content generator:
 - Users set their preferred delivery schedule (e.g., "Every Monday at 9am")
-- Episodes are pre-generated 2 hours before delivery for freshness
+- Episodes are pre-generated 4 hours before delivery for reliability and freshness
 - Email notifications sent at the scheduled time (like Substack)
 - Failed generations don't break the subscription - we skip and continue
 
@@ -18,13 +19,20 @@ Many Futures is a **subscription intelligence service**, not an on-demand conten
 
 ```
 Sunday 11pm: Create DRAFT episode record
-Monday 7:00am: Start generation (T-2:00)
-Monday 7:15am: First retry if failed (T-1:45)
-Monday 7:45am: Second retry (T-1:15)
-Monday 8:30am: Final retry (T-0:30)
+Monday 5:00am: Start generation (T-4:00)  # 4-hour window for reliability
+Monday 5:30am: First retry if failed (T-3:30)
+Monday 6:30am: Second retry (T-2:30)
+Monday 7:30am: Final retry (T-1:30)
+Monday 8:30am: Generation complete, final checks
 Monday 9:00am: Send email if successful
 Monday 9:01am: Create next week's DRAFT
 ```
+
+**Rationale for 4-hour window:**
+- If n8n goes down at 7am, we still have time to recover for 9am delivery
+- Allows manual intervention if systematic failures occur
+- Provides buffer during high load periods
+- Content remains fresh (generated morning of delivery)
 
 ## 📊 Queue Distribution Strategy
 
@@ -34,9 +42,9 @@ Monday 9:01am: Create next week's DRAFT
 // Process episodes by timezone to distribute load
 const timezoneSchedule = {
   'UTC': {
-    8: '6:00',  // Generate at 6am for 8am delivery
-    9: '7:00',  // Generate at 7am for 9am delivery
-    10: '8:00', // Generate at 8am for 10am delivery
+    8: '4:00',  // Generate at 4am for 8am delivery (4-hour window)
+    9: '5:00',  // Generate at 5am for 9am delivery
+    10: '6:00', // Generate at 6am for 10am delivery
   },
   'America/New_York': {
     8: '11:00', // Generate at 11am UTC for 8am EST
@@ -91,10 +99,32 @@ showMessage(`Your first episode arrives ${format(firstDelivery)}`);
 
 ### 2. Ongoing Delivery
 ```typescript
-// Cron job runs every 5 minutes
+// Schedule specific jobs instead of 5-min polling for efficiency
+// This runs once daily at midnight to schedule next day's generation jobs
+export async function scheduleGenerationJobs() {
+  const tomorrow = addDays(new Date(), 1);
+  const episodes = await getEpisodesDueForGeneration(tomorrow);
+  
+  for (const episode of episodes) {
+    const genTime = subHours(episode.scheduled_for, 4); // 4-hour window
+    
+    // Schedule precise job for this episode
+    await scheduleJob({
+      runAt: genTime,
+      jobType: 'generate_episode',
+      data: { 
+        episodeId: episode.id,
+        idempotencyKey: `${episode.project_id}-${episode.scheduled_for}`, // Prevent duplicates
+        priority: calculatePriority(episode) // Premium users = 10, Trial = 5
+      }
+    });
+  }
+}
+
+// Original 5-min cron kept as fallback for missed episodes
 export async function processQueue() {
   const now = new Date();
-  const twoHoursFromNow = addHours(now, 2);
+  const fourHoursFromNow = addHours(now, 4); // Updated to 4 hours
   
   // Find episodes due for generation
   const dueEpisodes = await findEpisodesDueBetween(now, twoHoursFromNow);
@@ -208,12 +238,13 @@ export async function updateSchedule(projectId: string, newCadence: CadenceConfi
 ### Generation Fails
 **Behavior**: Try 3 times, then skip this delivery
 ```typescript
-// Retry schedule for 9am delivery:
+// Retry schedule for 9am delivery (with 4-hour window):
 const retrySchedule = {
-  1: '7:15am', // 15 min after initial
-  2: '7:45am', // 30 min after first retry
-  3: '8:30am'  // 45 min after second retry
+  1: '5:30am', // 30 min after initial (T-3:30)
+  2: '6:30am', // 1 hour after first retry (T-2:30)
+  3: '7:30am'  // 1 hour after second retry (T-1:30)
 };
+// Still have 90 minutes buffer before delivery if all retries fail
 
 // After final failure:
 export async function handleFinalFailure(episodeId: string) {
@@ -242,8 +273,9 @@ const dailyProject = {
   }
 };
 
-// Generates at 6am for 8am delivery, every day
+// Generates at 4am for 8am delivery, every day
 // Weekends included
+// 4-hour window ensures reliability even during peak loads
 ```
 
 ## 📈 Scale Considerations
@@ -271,6 +303,12 @@ export async function processQueue() {
 
 ### Database Indexes for Performance
 ```sql
+-- CRITICAL: Add idempotency to prevent duplicate episodes
+ALTER TABLE episodes 
+ADD COLUMN idempotency_key TEXT,
+ADD CONSTRAINT unique_episode_schedule 
+UNIQUE (project_id, idempotency_key);
+
 -- Index for queue processing
 CREATE INDEX idx_episodes_generation_queue 
 ON episodes(scheduled_for, status, generation_attempts)
@@ -288,13 +326,14 @@ ON projects(timezone, cadence_config->>'deliveryHour');
 
 ### Cost Projections
 ```typescript
-// Per episode costs (estimated)
+// Per episode costs (conservative estimate)
 const costs = {
-  research: 0.30,  // GPT-4 for research
-  writing: 0.50,   // Claude for writing
-  qa: 0.20,        // GPT-3.5 for QA
-  total: 1.00      // £1 per episode
+  research: 0.50,  // GPT-4 for research (increased)
+  writing: 1.00,   // Claude for writing (increased)
+  qa: 0.50,        // GPT-3.5 for QA (increased)
+  total: 2.00      // £2 per episode
 };
+// Budget £2-3 per episode for safety margin
 
 // At scale (1000 users)
 const projections = {
@@ -310,7 +349,7 @@ const projections = {
 2. **Generation success rate**: >90% succeed on first attempt
 3. **Retry success rate**: >95% succeed within 3 attempts
 4. **User satisfaction**: Episodes arrive predictably, like a newsletter
-5. **Cost per episode**: <£2 including retries
+5. **Cost per episode**: <£3 including retries
 
 ## 🔗 Related Documentation
 
