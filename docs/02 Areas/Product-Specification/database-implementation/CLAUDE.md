@@ -13,10 +13,11 @@ CLAUDE.md files provide context-specific instructions and patterns that get auto
 
 ## Current Database Status
 
-- **Schema**: ✅ All 9 critical tables defined in `/src/lib/database-schema.ts`
-- **Mock Data**: ⏳ Needs updating in `/src/lib/mock-data.ts`
-- **Supabase**: ⏳ Not yet connected
-- **Front-End**: ⏳ Needs testing with new schema
+- **Schema**: ✅ COMPLETE - All 12 tables defined with timing clarifications
+- **Mock Data**: ✅ Updated and working
+- **Documentation**: ✅ Comprehensive with rationale
+- **Supabase**: 🆕 Ready to implement
+- **Front-End**: ✅ Tested with mock data
 
 ## Critical Tables Reference
 
@@ -33,7 +34,30 @@ CLAUDE.md files provide context-specific instructions and patterns that get auto
 8. **ChatSession/ChatMessage** - Chat
 9. **Highlight** - Text selection
 
-## Implementation Patterns
+## Critical Implementation Patterns
+
+### Timing Fields (MUST BE CLEAR)
+```typescript
+// Episode table - User perspective
+scheduledFor: Date;           // When user expects episode (9am)
+generationStartedAt?: Date;   // When generation began (5am)
+
+// Queue table - System perspective
+generationStartTime: Date;    // START generation here (5am)
+targetDeliveryTime: Date;     // User expects episode (9am)
+```
+
+### Service Role Configuration (CRITICAL)
+```typescript
+// TWO clients needed:
+// 1. Frontend (respects RLS)
+const supabase = createClient(URL, ANON_KEY);
+
+// 2. Backend/Cron (bypasses RLS)
+const supabaseAdmin = createClient(URL, SERVICE_ROLE_KEY, {
+  auth: { autoRefreshToken: false, persistSession: false }
+});
+```
 
 ### When Creating Mock Data
 
@@ -156,11 +180,24 @@ Before marking any database work complete:
 - **Implementation Hub**: `./README.md`
 - **Progress**: `./progress-summary.md`
 
-## Migration Path
+## Ready for Supabase
 
-1. **Current**: Mock data with complete schema
-2. **Next**: Update mock-data.ts to match schema
-3. **Then**: Connect Supabase with migrations
-4. **Finally**: Switch from mock to real data
+### Implementation Order
+1. Create Supabase project
+2. Run migrations in single transaction
+3. Create RLS policies immediately
+4. Add constraints and indexes
+5. Create triggers
+6. Set up two clients (anon + service)
+7. Test with both keys
+8. Connect frontend
 
-Remember: Empty tables are free, migrations are expensive!
+### Critical Constraints
+```sql
+-- Prevent duplicates
+UNIQUE (project_id, idempotency_key) ON episodes;
+UNIQUE (episode_id, status) ON queue WHERE status IN ('pending', 'processing');
+UNIQUE (organization_id, date) ON token_usage_daily;
+```
+
+Remember: RLS must be created WITH tables, not after!

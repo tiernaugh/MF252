@@ -125,8 +125,10 @@ Once we prove that, we can add everything else.
   - [x] Build episode reader
   - [x] Build new project conversation
   - [x] Implement unified design system
-- [ ] Set up database with Supabase
-- [ ] Attach database to UI
+- [x] Set up database with Supabase (MF-252)
+- [x] Implement Drizzle ORM schema (16 tables)
+- [x] Seed database with test data
+- [ ] Attach database to UI (replace mock data)
 - [ ] Add authentication with Clerk
 - [ ] Error management with Sentry
 - [ ] Analytics with PostHog
@@ -150,7 +152,8 @@ Once we prove that, we can add everything else.
 
 ## Tech Stack
 - **Framework**: T3 (Next.js, tRPC, TypeScript, Tailwind)
-- **Database**: Supabase (PostgreSQL)
+- **Database**: Supabase (PostgreSQL) - ✅ LIVE & WORKING
+- **ORM**: Drizzle - ✅ CONFIGURED & VERIFIED
 - **Auth**: Clerk
 - **Payments**: Stripe
 - **AI Orchestration**: n8n Cloud (handles Research, Writer, QA agents)

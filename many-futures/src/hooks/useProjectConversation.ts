@@ -142,6 +142,15 @@ export function useProjectConversation(): UseProjectConversationReturn {
             console.log('Parsed brief:', brief);
             setProjectBrief(brief);
             setPhase('brief_generated');
+            
+            // If we have a projectId, redirect to the created project
+            if (brief.projectId) {
+              console.log('Project created with ID:', brief.projectId);
+              // Redirect after a short delay to show the brief
+              setTimeout(() => {
+                window.location.href = `/projects/${brief.projectId}`;
+              }, 3000);
+            }
           } catch (e) {
             console.error('Failed to parse brief:', e);
             console.error('Raw brief data:', briefData);

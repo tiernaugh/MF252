@@ -1,193 +1,133 @@
 # Database Implementation Hub
 
 **Last Updated:** 2025-08-15  
-**Status:** 🟡 Schema Complete, Implementation Planned  
-**Context:** Moving from prototype to production with Clerk auth & n8n integration
+**Status:** 🟢 Database Implemented with Drizzle ORM  
+**Database:** MF-252 (Supabase)  
 
-## 🎯 Current Objective
+## ✅ Current Status
 
-Transform the working prototype into a **subscription-based intelligence service**:
-1. **Supabase database** with all 9 critical tables
-2. **Clerk authentication** with organization context
-3. **Subscription delivery model** - episodes generated 2 hours before scheduled time
-4. **n8n integration** for async episode generation
-5. **Production patterns** (queue processing, retry logic, cost controls)
+The database implementation is **COMPLETE** using Drizzle ORM with Supabase. All 16 tables are live with test data.
 
-## 📊 Implementation Status
+### What's Implemented
+- **16 tables** covering all MVP and future features
+- **Drizzle ORM** for type-safe database access
+- **Test data** seeded for development
+- **Full TypeScript integration**
+- **Drizzle Studio** ⚠️ (beta - not working, use TablePlus/DBeaver instead)
 
-### Core Tables (9 Critical + Phase 2)
+### Test Credentials
+- **Email:** test@manyfutures.ai
+- **Organization:** Test User's Workspace
+- **Project:** Future of AI Security
+- **Episodes:** 3 (2 published, 1 draft)
 
-| Table | Schema | Mock Data | Front-End | Status |
-|-------|--------|-----------|-----------|---------|
-| EpisodeScheduleQueue | ✅ | ✅ | N/A | Complete |
-| TokenUsageDaily | ✅ | N/A | N/A | Schema Only |
-| PlanningNote | ✅ | ✅ | Ready | Complete |
-| AgentMemory | ✅ | N/A | N/A | Schema Only |
-| UserEvent | ✅ | ✅ | Ready | Complete |
-| AuditLog | ✅ | ✅ | N/A | Complete |
-| Block | ✅ | ✅ | Ready | Complete |
-| ChatSession | ✅ | N/A | N/A | Schema Only |
-| ChatMessage | ✅ | N/A | N/A | Schema Only |
-| Highlight | ✅ | N/A | N/A | Schema Only |
+## 📊 Database Tables
 
-### Existing Tables (Updates)
+| Category | Tables | Status |
+|----------|--------|--------|
+| **Core** | Organizations, Users, OrganizationMembers, Projects | ✅ LIVE |
+| **Content** | Episodes, EpisodeScheduleQueue, Blocks | ✅ LIVE |
+| **Operations** | TokenUsage, TokenUsageDaily, PlanningNotes | ✅ LIVE |
+| **Tracking** | UserEvents, AuditLog | ✅ LIVE |
+| **Future** | AgentMemory, ChatSessions, ChatMessages, Highlights | ✅ LIVE |
 
-| Table | Changes | Status |
-|-------|---------|--------|
-| Episode | Add generation_attempts, generation_errors | ✅ Complete |
-| Project | Verify cadenceConfig, memories structure | ✅ Complete |
-| User | Add timezone field | ✅ Complete |
-| Organization | Verify structure | ✅ Complete |
+## 🛠️ Quick Reference
 
-## 📁 File Locations
-
-### Schema Files
-- **Main Schema:** `/src/lib/database-schema.ts`
-- **Mock Data:** `/src/lib/mock-data.ts`
-- **Final Schema:** `./schema-final.ts` (for Supabase)
-
-### Documentation
-- **Expert Feedback:** `/docs/01 Projects/t3-handover/t3-database-updates/`
-- **Our Response:** `/docs/02 Areas/Product-Specification/PRDs-ADRs/database-schema/schema-feedback-response.md`
-- **Project Settings:** `/docs/02 Areas/Product-Specification/PRDs-ADRs/project-settings/`
-
-### Front-End Pages to Test
-- `/src/app/(dashboard)/projects/page.tsx`
-- `/src/app/(dashboard)/projects/[id]/page.tsx`
-- `/src/app/(dashboard)/projects/[id]/settings/page.tsx`
-- `/src/app/(dashboard)/episodes/[id]/page.tsx`
-
-## 🔄 Implementation Timeline
-
-### ✅ Completed (Schema & Mock Data)
-1. Database schema defined with 9 critical tables
-2. Mock data updated and tested
-3. Front-end verified with mock data
-4. Expert feedback incorporated
-
-### 📋 Day 1: Database & API (Planned)
-1. ⏳ Create Supabase project & tables
-2. ⏳ Generate TypeScript types
-3. ⏳ Build database client wrapper
-4. ⏳ Implement cron job for queue processing (every 5 min)
-5. ⏳ Create n8n webhook endpoints (progress/complete/error)
-
-### 📋 Day 2: Auth & Integration (Planned)
-1. ⏳ Set up Clerk authentication
-2. ⏳ Add organization context
-3. ⏳ Connect UI to real database
-4. ⏳ Implement async generation UI
-5. ⏳ Test end-to-end flow
-
-### 📋 Day 3: Production Patterns (Planned)
-1. ⏳ Queue processing with row locking
-2. ⏳ Cost control implementation
-3. ⏳ Event tracking system
-4. ⏳ Error recovery mechanisms
-5. ⏳ Deploy to staging
-
-## 🚨 Critical Decisions Made
-
-### Based on Expert Feedback
-
-1. **Queue-Based Scheduling**: EpisodeScheduleQueue table for resilience
-2. **Performance Optimization**: TokenUsageDaily with PostgreSQL triggers
-3. **Feedback Loop Priority**: PlanningNote table for MVP (not deferred)
-4. **Future-Proofing**: Create all tables now, even if empty
-5. **Event Tracking**: UserEvent table instead of boolean flags
-
-### Our Additions
-
-1. **Flexible Scheduling**: cadenceConfig with days array
-2. **Project-Based Pricing**: Limit projects, not frequency
-3. **Simple Blocks**: Start with one markdown block per episode
-4. **Memories in Project**: Keep simple for MVP, prepare migration
-
-## 📝 Quick Reference
-
-### Key Patterns
-
+### Database Connection
 ```typescript
-// Subscription scheduling
-interface ProjectSchedule {
-  cadenceConfig: {
-    mode: 'daily' | 'weekly' | 'custom';
-    days: number[];        // [0-6] where 0=Sunday
-    deliveryHour: number;   // 0-23 in user's timezone
-  };
-  timezone: string;         // User's IANA timezone
-  nextScheduledAt: Date;    // Next delivery in UTC
-}
+import { db } from "~/server/db";
+import * as schema from "~/server/db/schema";
 
-// Episode generation timeline
-const timeline = {
-  'T-2:00': 'Start generation',
-  'T-1:45': 'First retry if failed',
-  'T-1:15': 'Second retry',
-  'T-0:30': 'Final retry',
-  'T-0:00': 'Delivery time'
-};
+// Example query
+const projects = await db.select().from(schema.projects);
 ```
 
-### Queue Processing
-
-```sql
--- Critical for concurrency
-SELECT * FROM episode_schedule_queue 
-WHERE status = 'pending' 
-FOR UPDATE SKIP LOCKED
+### Common Commands
+```bash
+pnpm db:studio     # Open Drizzle Studio (visual DB browser)
+pnpm db:push       # Push schema changes to database
+pnpm db:generate   # Generate new migrations
+npx tsx src/server/db/seed.ts  # Re-run seed data
 ```
 
-### Cost Control
+### Key Files
+- **Schema:** `/many-futures/src/server/db/schema.ts` - Drizzle schema definition
+- **Seed:** `/many-futures/src/server/db/seed.ts` - Test data script
+- **Config:** `/many-futures/drizzle.config.ts` - Drizzle configuration
+- **Migration:** `/many-futures/drizzle/` - Generated SQL migrations
 
-```typescript
-// Check TokenUsageDaily, not raw records
-const usage = await db.tokenUsageDaily.findFirst({
-  where: { organizationId, date: today }
-});
-if (usage?.total_cost_gbp >= 50) {
-  // Circuit breaker
-}
-```
+## 🚀 Next Steps
 
-## 🎯 Next Immediate Steps
+### Immediate Priorities (🚧 IN PROGRESS)
+1. **Replace mock data** - Update components to use real queries → [See connecting-live-data/](./connecting-live-data/)
+2. **Add Clerk auth** - User authentication and org context
+3. **Create API routes** - CRUD operations for all entities
+4. **Connect frontend** - Wire up forms and displays
 
-1. **Create Supabase project** and run migrations
-2. **Install Clerk** and configure authentication
-3. **Create database client** (`/src/lib/db.ts`)
-4. **Update project creation** to save to database
-5. **Implement n8n webhooks** for episode generation
+### Coming Soon
+- Queue processing with cron jobs
+- n8n webhook integration
+- RLS policies with Clerk
+- Token usage aggregation triggers
 
-## 🚀 New Documentation
+## 📁 Documentation Structure
 
-### Implementation Guides
-- **🔴 [Critical Setup Requirements](./critical-setup-requirements.md)** - MUST READ: Resolved timing ambiguity & service role setup
-- **[Schema with Rationale](./schema-with-rationale.md)** - Complete database schema with clarified timing fields
-- **[Architectural Decisions](./architectural-decisions.md)** - Key technical decisions and rationale
-- **[Implementation Plan](./implementation-plan.md)** - Complete roadmap from prototype to production
-- **[Subscription Delivery Model](./subscription-delivery-model.md)** - 4-hour generation window, scheduled delivery
-- **[n8n Integration Patterns](./n8n-integration-patterns.md)** - Webhook integration and retry strategies
-- **[RLS Security Policies](./rls-security-policies.md)** - Must implement with table creation
+### Active Documentation
+- `README.md` - This file, main hub
+- `drizzle-implementation-guide.md` - Drizzle setup details
+- `implementation-checklist.md` - Progress tracking
+- `progress-summary-2025-01-16.md` - Today's implementation summary
 
-## 📞 Contact Points
+### Reference Documentation
+- `architectural-decisions.md` - Key design decisions
+- `schema-with-rationale.md` - Detailed schema explanations
+- `subscription-delivery-model.md` - Episode delivery architecture
+- `n8n-integration-patterns.md` - Webhook integration patterns
+- `rls-security-policies.md` - Security implementation guide
+- `edge-cases-to-test.md` - Testing scenarios
+- `critical-setup-requirements.md` - Critical configuration notes
 
-- **Product Lead:** Review schema decisions
-- **Expert Advisors:** Final review before Supabase
-- **T3 Team:** Implementation support
+### Implementation Tracking
+- `implementation-plan.md` - Original implementation roadmap
+- `CLAUDE.md` - AI context patterns
 
-## 🔗 Related Documents
+### Archived (Pre-Drizzle)
+Located in `archive-pre-drizzle/`:
+- SQL migration files (replaced by Drizzle)
+- Pre-implementation planning docs
+- Setup guides for direct SQL approach
 
-### New Implementation Docs
-- **[Implementation Plan](./implementation-plan.md)** - Day-by-day roadmap
-- **[n8n Integration Patterns](./n8n-integration-patterns.md)** - Async generation UX
-- **[Edge Cases to Test](./edge-cases-to-test.md)** - Critical scenarios
+## 🔗 Related Documentation
 
-### Previous Work
-- [Schema Feedback Response](../PRDs-ADRs/database-schema/schema-feedback-response.md)
-- [Project Settings PRD](../PRDs-ADRs/project-settings/PRD-project-settings.md)
-- [Scheduling Architecture ADR](../PRDs-ADRs/project-settings/ADR-001-scheduling-architecture.md)
-- [Context Recovery Guide](./context-recovery.md)
+- **Main Project:** `/many-futures/CLAUDE.md`
+- **Mock Data:** `/many-futures/src/lib/mock-data.ts` (to be replaced)
+- **Database Types:** `/many-futures/src/lib/database-schema.ts` (reference only)
+
+## 📝 Key Decisions
+
+1. **Drizzle ORM** - Chosen for type safety and better DX
+2. **Table Prefix** - `many-futures_` for namespace isolation
+3. **Soft Deletes** - All tables have `deletedAt` and `deletedBy`
+4. **UUID Primary Keys** - Auto-generated in database
+5. **Comprehensive Schema** - All 16 tables created upfront
+
+## ⚠️ Important Notes
+
+- **Environment Variables:** DATABASE_URL must be set in `.env`
+- **Table Names:** All prefixed with `many-futures_`
+- **Foreign Keys:** Some names truncated by PostgreSQL (normal)
+- **RLS Policies:** Not yet implemented (waiting for Clerk)
+- **Triggers:** Can be added later for aggregation
+- **Drizzle Studio:** Beta quality, doesn't work with our setup - use TablePlus/DBeaver instead
+- **Connection:** Using Supabase pooler URL for better performance
+
+## 🐛 Bug Fixes (2025-08-15)
+
+### Fixed: Missing tokenUsageRelations
+- **Issue:** Drizzle Studio error "not enough information to infer relation"
+- **Solution:** Added `tokenUsageRelations` to schema.ts
+- **Impact:** All relations now working correctly
 
 ---
 
-**Remember:** This is our source of truth for the production implementation. Keep it updated as we progress!
+**Status:** The database is fully operational and ready for feature development! 🚀

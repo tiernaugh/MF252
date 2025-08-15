@@ -144,6 +144,7 @@ Once we prove that, we can add everything else.
 - **Auth**: Clerk
 - **Payments**: Stripe
 - **AI**: OpenAI GPT-5, Claude
+
 - **Monitoring**: Sentry
 - **Analytics**: PostHog
 - **Rate Limiting**: Upstash

@@ -11,6 +11,8 @@ import {
   logSecurityEvent,
   getBlockedResponse 
 } from '~/lib/security';
+import { createProject } from '~/server/actions/projects';
+import { getCurrentOrganization, getCurrentUser } from '~/server/actions/organizations';
 
 // Allow streaming responses up to 30 seconds
 export const maxDuration = 30;
@@ -275,9 +277,42 @@ export async function POST(request: NextRequest) {
               
               // Parse the brief
               const titleMatch = briefText.match(/^(.+)$/m);
+              const title = titleMatch ? titleMatch[1]?.trim() ?? 'Future Research Project' : 'Future Research Project';
+              
+              // Save project to database
+              let projectId = null;
+              try {
+                const org = await getCurrentOrganization();
+                const user = await getCurrentUser();
+                
+                const project = await createProject({
+                  organizationId: org.id,
+                  userId: user.id,
+                  title: title,
+                  onboardingBrief: {
+                    conversation: messages,
+                    description: briefText.substring(0, 500), // First 500 chars as description
+                    summary: title,
+                    context: "Strategic foresight and trend analysis",
+                    focusAreas: []
+                  },
+                  cadenceConfig: {
+                    mode: 'weekly',
+                    days: [1, 4], // Monday and Thursday default
+                  }
+                });
+                
+                projectId = project.id;
+                console.log('Project saved to database:', projectId);
+              } catch (error) {
+                console.error('Failed to save project to database:', error);
+                // Continue anyway - we'll still show the brief
+              }
+              
               const brief = {
-                title: titleMatch ? titleMatch[1]?.trim() ?? 'Future Research Project' : 'Future Research Project',
-                brief: briefText
+                title: title,
+                brief: briefText,
+                projectId: projectId // Include project ID if saved
               };
               
               // Send brief generation signal
@@ -312,9 +347,41 @@ export async function POST(request: NextRequest) {
                 
                 // Parse the brief
                 const titleMatch = briefText.match(/^(.+)$/m);
+                const title = titleMatch ? titleMatch[1]?.trim() ?? 'Future Research Project' : 'Future Research Project';
+                
+                // Save project to database
+                let projectId = null;
+                try {
+                  const org = await getCurrentOrganization();
+                  const user = await getCurrentUser();
+                  
+                  const project = await createProject({
+                    organizationId: org.id,
+                    userId: user.id,
+                    title: title,
+                    onboardingBrief: {
+                      conversation: messages,
+                      description: briefText.substring(0, 500),
+                      summary: title,
+                      context: "Strategic foresight and trend analysis",
+                      focusAreas: []
+                    },
+                    cadenceConfig: {
+                      mode: 'weekly',
+                      days: [1, 4],
+                    }
+                  });
+                  
+                  projectId = project.id;
+                  console.log('Project saved to database (GPT-4 fallback):', projectId);
+                } catch (error) {
+                  console.error('Failed to save project to database:', error);
+                }
+                
                 const brief = {
-                  title: titleMatch ? titleMatch[1]?.trim() ?? 'Future Research Project' : 'Future Research Project',
-                  brief: briefText
+                  title: title,
+                  brief: briefText,
+                  projectId: projectId
                 };
                 
                 // Send brief generation signal

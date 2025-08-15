@@ -1,11 +1,20 @@
 # Context Recovery Guide
 
 **Purpose:** Everything needed to resume database implementation if context is lost  
-**Last Updated:** 2025-08-15
+**Last Updated:** 2025-08-15 (End of major schema work)
 
 ## 🎯 Where We Are
 
-We're implementing the final database schema after two rounds of expert feedback. The schema needs to support our MVP while preventing future migrations through Phase 3.
+✅ **SCHEMA COMPLETE** - All critical issues resolved, ready for Supabase implementation.
+
+We've completed:
+1. Database schema with all 12 tables defined
+2. Resolved timing ambiguity (generation vs delivery times)
+3. Added all unique constraints and indexes
+4. Documented service role configuration
+5. Created comprehensive RLS policies
+6. Updated to 4-hour generation window
+7. Added idempotency keys and priority queue
 
 ## 🔑 Critical Context
 
@@ -64,18 +73,28 @@ interface UserEvent {
 
 ## ✅ Completed Work (2025-08-15)
 
-### What We've Done
-1. ✅ Updated `/src/lib/database-schema.ts` with all 9 critical tables
-2. ✅ Updated `/src/lib/mock-data.ts` with types and mock data
-3. ✅ Fixed all TypeScript errors
-4. ✅ Verified build succeeds
-5. ✅ Tested all front-end pages
-6. ✅ Updated documentation
+### Schema & Documentation Complete
+1. ✅ Updated `/src/lib/database-schema.ts` with timing clarifications
+2. ✅ Created comprehensive schema documentation with rationale
+3. ✅ Resolved all timing ambiguities (generationStartTime vs targetDeliveryTime)
+4. ✅ Added unique constraints to prevent duplicates
+5. ✅ Documented service role configuration for cron jobs
+6. ✅ Created RLS policies for all tables
+7. ✅ Added performance-critical indexes
+8. ✅ Created trigger with error handling
+9. ✅ Documented cron schedules
+10. ✅ Updated mock data to match schema
 
 ## 🚧 Next Tasks
 
-### Edge Case Testing
-Testing database edge cases and validation rules (see edge-cases-to-test.md)
+### Supabase Implementation
+1. Create Supabase project
+2. Run migrations in single transaction
+3. Create RLS policies immediately after tables
+4. Add all constraints and indexes
+5. Set up two clients (anon + service_role)
+6. Test with both keys
+7. Implement cron jobs
 
 ### Files to Modify
 
@@ -119,11 +138,14 @@ pnpm dev           # Test all pages
 
 ## 📝 Implementation Checklist
 
-### Immediate (Today)
-- [ ] Update database-schema.ts with all 9 tables
-- [ ] Update mock-data.ts to match
-- [ ] Test all front-end pages
-- [ ] Run typecheck and build
+### Ready for Implementation
+- [x] Database schema complete with all tables
+- [x] Timing fields clarified
+- [x] Constraints documented
+- [x] Service role configuration documented
+- [x] RLS policies ready
+- [x] Indexes defined
+- [x] Triggers with error handling
 
 ### Tomorrow
 - [ ] Create schema-final.ts for Supabase
@@ -153,13 +175,32 @@ pnpm dev           # Test all pages
 - `/src/lib/mock-data.ts` - Mock data
 - `/many-futures/CLAUDE.md` - Patterns and rules
 
-## 💡 Key Insights to Remember
+## 💡 Critical Implementation Notes
 
-1. **PlanningNote is Priority 1** - User feedback loop is core to value prop
-2. **Queue table is critical** - Without it, production will break
-3. **Create all tables now** - Empty tables are free, migrations are expensive
-4. **Events over booleans** - Flexible tracking without schema changes
-5. **Simple blocks for MVP** - One markdown block per episode initially
+### Timing Fields (RESOLVED)
+```typescript
+// Episode table
+scheduledFor: Date;           // User expects episode (9am)
+generationStartedAt?: Date;   // Generation began (5am)
+
+// Queue table  
+generationStartTime: Date;    // START generation (5am)
+targetDeliveryTime: Date;     // User expects (9am)
+```
+
+### Service Role Setup (CRITICAL)
+```typescript
+// Two clients needed:
+const supabase = createClient(URL, ANON_KEY);           // Frontend
+const supabaseAdmin = createClient(URL, SERVICE_KEY);   // Backend/Cron
+```
+
+### Key Decisions
+1. **4-hour generation window** - Reliability over speed
+2. **Idempotency keys** - Prevent duplicate episodes
+3. **Priority queue** - Premium=10, Retry=8, Standard=5
+4. **Planning notes persist** - Even if generation fails
+5. **Soft deletes only** - Audit trail requirement
 
 ## 🚨 Common Pitfalls
 
