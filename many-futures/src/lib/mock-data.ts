@@ -132,6 +132,112 @@ export type TokenUsage = {
 };
 
 // ============================================
+// CRITICAL PRODUCTION TABLES (Added 2025-08-15)
+// ============================================
+
+// Queue-based scheduling for resilience
+export type EpisodeScheduleQueue = {
+  id: string;
+  projectId: string;
+  organizationId: string;
+  scheduledFor: Date;
+  pickedUpAt?: Date | null;
+  completedAt?: Date | null;
+  attemptCount: number;
+  lastError?: string | null;
+  lastAttemptAt?: Date | null;
+  status: 'pending' | 'processing' | 'completed' | 'failed' | 'cancelled' | 'blocked';
+  episodeId?: string | null;
+  metadata?: {
+    userTimezone?: string;
+    userLocalTime?: string;
+    generationMethod?: string;
+  } | null;
+  createdAt: Date;
+  updatedAt: Date;
+};
+
+// User feedback loop - Priority 1!
+export type PlanningNote = {
+  id: string;
+  projectId: string;
+  organizationId: string;
+  userId: string;
+  episodeId?: string | null;
+  note: string; // Max 240 chars
+  scope: 'NEXT_EPISODE' | 'GENERAL_FEEDBACK' | 'TOPIC_REQUEST' | 'DEPTH_ADJUSTMENT';
+  status: 'pending' | 'acknowledged' | 'incorporated' | 'deferred' | 'archived';
+  processedAt?: Date | null;
+  processedByEpisodeId?: string | null;
+  aiInterpretation?: string | null;
+  priority?: 'LOW' | 'MEDIUM' | 'HIGH';
+  userUpvoted?: boolean;
+  archiveAfterEpisodes?: number;
+  expiresAt?: Date | null;
+  createdAt: Date;
+  consumedAt?: Date | null;
+};
+
+// Flexible event tracking
+export type UserEvent = {
+  id: string;
+  userId: string;
+  organizationId: string;
+  eventType: string; // Flexible string, not enum
+  eventData?: any; // JSON context
+  sessionId?: string | null;
+  deviceType?: string | null;
+  sequenceNumber?: number;
+  timeToNext?: number | null;
+  createdAt: Date;
+};
+
+// Audit trail for compliance
+export type AuditLog = {
+  id: string;
+  userId: string;
+  organizationId: string;
+  action: string;
+  resourceType?: string | null;
+  resourceId?: string | null;
+  oldValue?: string | null;
+  newValue?: string | null;
+  ipAddress?: string | null;
+  userAgent?: string | null;
+  success: boolean;
+  errorMessage?: string | null;
+  createdAt: Date;
+};
+
+// Content blocks - MVP: one markdown block per episode
+export type Block = {
+  id: string;
+  episodeId: string;
+  organizationId: string;
+  projectId: string;
+  type: 'MARKDOWN' | 'COLD_OPEN' | 'SIGNAL' | 'PATTERN' | 'SCENARIO' | 'QUESTION';
+  content: string;
+  position: number;
+  reasoning?: string | null;
+  confidence?: number | null;
+  citations?: Array<{
+    url: string;
+    title: string;
+    relevance: number;
+    excerpt?: string;
+  }> | null;
+  wordCount?: number;
+  readingSeconds?: number;
+  highlightCount?: number;
+  feedbackCount?: number;
+  createdAt: Date;
+  updatedAt: Date;
+  version: number;
+  deletedAt?: Date | null;
+  deletedBy?: string | null;
+};
+
+// ============================================
 // MOCK DATA INSTANCES
 // These represent realistic data for testing
 // ============================================
@@ -565,6 +671,266 @@ export const mockUpcomingEpisodes: UpcomingEpisode[] = [
       "Is the 4-day work week becoming mainstream in tech?"
     ],
     influenceDeadline: new Date("2025-08-14T18:00:00"),
+  }
+];
+
+// ============================================
+// NEW MOCK DATA FOR CRITICAL TABLES
+// ============================================
+
+// Schedule queue showing various states
+export const mockScheduleQueue: EpisodeScheduleQueue[] = [
+  {
+    id: "queue_pending_1",
+    projectId: "proj_1",
+    organizationId: mockOrganization.id,
+    scheduledFor: new Date("2025-08-20T09:00:00Z"),
+    pickedUpAt: null,
+    completedAt: null,
+    attemptCount: 0,
+    lastError: null,
+    lastAttemptAt: null,
+    status: 'pending',
+    episodeId: null,
+    metadata: {
+      userTimezone: mockUser.timezone,
+      userLocalTime: "Tuesday 9:00 AM",
+      generationMethod: 'scheduled'
+    },
+    createdAt: new Date("2025-08-13"),
+    updatedAt: new Date("2025-08-13"),
+  },
+  {
+    id: "queue_completed_1",
+    projectId: "proj_1",
+    organizationId: mockOrganization.id,
+    scheduledFor: new Date("2025-08-13T09:00:00Z"),
+    pickedUpAt: new Date("2025-08-13T09:01:00Z"),
+    completedAt: new Date("2025-08-13T09:05:00Z"),
+    attemptCount: 1,
+    lastError: null,
+    lastAttemptAt: new Date("2025-08-13T09:01:00Z"),
+    status: 'completed',
+    episodeId: "ep_3",
+    metadata: {
+      userTimezone: mockUser.timezone,
+      userLocalTime: "Tuesday 9:00 AM",
+      generationMethod: 'scheduled'
+    },
+    createdAt: new Date("2025-08-06"),
+    updatedAt: new Date("2025-08-13T09:05:00Z"),
+  }
+];
+
+// User events tracking key interactions
+export const mockUserEvents: UserEvent[] = [
+  {
+    id: "event_001",
+    userId: mockUser.id,
+    organizationId: mockOrganization.id,
+    eventType: 'onboarding_started',
+    eventData: { source: 'homepage_cta' },
+    sessionId: "session_abc",
+    deviceType: 'desktop',
+    sequenceNumber: 1,
+    timeToNext: 45000,
+    createdAt: new Date("2025-07-15T10:00:00Z"),
+  },
+  {
+    id: "event_002",
+    userId: mockUser.id,
+    organizationId: mockOrganization.id,
+    eventType: 'onboarding_complete',
+    eventData: { 
+      projectId: "proj_1",
+      turnCount: 4,
+      duration: 180000 
+    },
+    sessionId: "session_abc",
+    deviceType: 'desktop',
+    sequenceNumber: 2,
+    timeToNext: null,
+    createdAt: new Date("2025-07-15T10:45:00Z"),
+  },
+  {
+    id: "event_003",
+    userId: mockUser.id,
+    organizationId: mockOrganization.id,
+    eventType: 'first_episode_opened',
+    eventData: { 
+      episodeId: "ep_1",
+      projectId: "proj_1" 
+    },
+    sessionId: "session_def",
+    deviceType: 'mobile',
+    sequenceNumber: 1,
+    timeToNext: 240000,
+    createdAt: new Date("2025-07-22T14:30:00Z"),
+  },
+  {
+    id: "event_004",
+    userId: mockUser.id,
+    organizationId: mockOrganization.id,
+    eventType: 'settings_updated',
+    eventData: {
+      projectId: "proj_1",
+      changes: { cadenceConfig: { days: [1, 3, 5] } }
+    },
+    sessionId: "session_ghi",
+    deviceType: 'desktop',
+    sequenceNumber: 1,
+    timeToNext: null,
+    createdAt: new Date("2025-08-13T15:00:00Z"),
+  }
+];
+
+// Planning notes showing user feedback
+export const mockPlanningNotes: PlanningNote[] = [
+  {
+    id: "note_001",
+    projectId: "proj_1",
+    organizationId: mockOrganization.id,
+    userId: mockUser.id,
+    episodeId: "ep_1",
+    note: "More focus on EU AI Act implications for UK firms",
+    scope: 'NEXT_EPISODE',
+    status: 'pending',
+    processedAt: null,
+    processedByEpisodeId: null,
+    aiInterpretation: null,
+    priority: 'HIGH',
+    userUpvoted: true,
+    archiveAfterEpisodes: 3,
+    expiresAt: null,
+    createdAt: new Date("2025-08-10"),
+    consumedAt: null,
+  },
+  {
+    id: "note_002",
+    projectId: "proj_1",
+    organizationId: mockOrganization.id,
+    userId: mockUser.id,
+    episodeId: "ep_2",
+    note: "Less speculation, more concrete examples please",
+    scope: 'DEPTH_ADJUSTMENT',
+    status: 'incorporated',
+    processedAt: new Date("2025-08-12"),
+    processedByEpisodeId: "ep_3",
+    aiInterpretation: "User prefers practical examples over theoretical scenarios",
+    priority: 'MEDIUM',
+    userUpvoted: false,
+    archiveAfterEpisodes: undefined,
+    expiresAt: null,
+    createdAt: new Date("2025-08-05"),
+    consumedAt: new Date("2025-08-12"),
+  }
+];
+
+// Content blocks - one per episode for MVP
+export const mockBlocks: Block[] = [
+  {
+    id: "blk_001",
+    episodeId: "ep_1",
+    organizationId: mockOrganization.id,
+    projectId: "proj_1",
+    type: 'MARKDOWN',
+    content: mockEpisodes[0]!.content,
+    position: 10,
+    reasoning: "Focus on regulatory advantages based on user's consultancy context",
+    confidence: 0.85,
+    citations: [
+      {
+        url: "https://www.mckinsey.com/capabilities/quantumblack/our-insights/the-state-of-ai-in-2024",
+        title: "The state of AI in 2024",
+        relevance: 0.9,
+        excerpt: "Regulatory compliance emerging as key differentiator"
+      }
+    ],
+    wordCount: 1200,
+    readingSeconds: 360,
+    highlightCount: 0,
+    feedbackCount: 0,
+    createdAt: mockEpisodes[0]!.createdAt,
+    updatedAt: mockEpisodes[0]!.updatedAt,
+    version: 1,
+    deletedAt: null,
+    deletedBy: null,
+  },
+  {
+    id: "blk_002",
+    episodeId: "ep_2",
+    organizationId: mockOrganization.id,
+    projectId: "proj_1",
+    type: 'MARKDOWN',
+    content: mockEpisodes[1]!.content,
+    position: 10,
+    reasoning: "Exploring practical applications of AI in boutique consultancies",
+    confidence: 0.78,
+    citations: null,
+    wordCount: 1100,
+    readingSeconds: 330,
+    highlightCount: 0,
+    feedbackCount: 0,
+    createdAt: mockEpisodes[1]!.createdAt,
+    updatedAt: mockEpisodes[1]!.updatedAt,
+    version: 1,
+    deletedAt: null,
+    deletedBy: null,
+  },
+  {
+    id: "blk_003",
+    episodeId: "ep_3",
+    organizationId: mockOrganization.id,
+    projectId: "proj_1",
+    type: 'MARKDOWN',
+    content: episode2Content,
+    position: 10,
+    reasoning: "Deep dive into quantum computing implications per user interest",
+    confidence: 0.82,
+    citations: null,
+    wordCount: 1250,
+    readingSeconds: 375,
+    highlightCount: 0,
+    feedbackCount: 0,
+    createdAt: mockEpisodes[2]!.createdAt,
+    updatedAt: mockEpisodes[2]!.updatedAt,
+    version: 1,
+    deletedAt: null,
+    deletedBy: null,
+  }
+];
+
+// Audit log showing key actions
+export const mockAuditLog: AuditLog[] = [
+  {
+    id: "audit_001",
+    userId: mockUser.id,
+    organizationId: mockOrganization.id,
+    action: 'project.create',
+    resourceType: 'project',
+    resourceId: "proj_1",
+    oldValue: null,
+    newValue: "AI Impact on UK Design Consultancy",
+    ipAddress: "192.168.1.1",
+    userAgent: "Mozilla/5.0...",
+    success: true,
+    errorMessage: null,
+    createdAt: new Date("2025-07-15T10:45:00Z"),
+  },
+  {
+    id: "audit_002",
+    userId: mockUser.id,
+    organizationId: mockOrganization.id,
+    action: 'settings.update',
+    resourceType: 'project',
+    resourceId: "proj_1",
+    oldValue: "days: [2]",
+    newValue: "days: [1, 3, 5]",
+    ipAddress: "192.168.1.1",
+    userAgent: "Mozilla/5.0...",
+    success: true,
+    errorMessage: null,
+    createdAt: new Date("2025-08-13T15:00:00Z"),
   }
 ];
 
