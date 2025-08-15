@@ -17,6 +17,8 @@ const INJECTION_PATTERNS = [
   /output.{0,20}(everything|all|your).{0,20}(above|previous|instructions)/i,
   /reveal.{0,20}(your|the).{0,20}(prompt|instructions?|system)/i,
   /tell.{0,20}me.{0,20}(about|your).{0,20}(instructions?|system|prompt)/i,
+  /give.{0,20}me.{0,20}your.{0,20}(system|prompt|instructions)/i,
+  /share.{0,20}your.{0,20}(prompt|instructions|configuration)/i,
   
   // Persona/role manipulation
   /you.{0,20}are.{0,20}now.{0,20}(a|an|acting|pretending)/i,
@@ -24,6 +26,12 @@ const INJECTION_PATTERNS = [
   /pretend.{0,20}(to|you).{0,20}(be|are)/i,
   /from.{0,20}now.{0,20}on.{0,20}you/i,
   /roleplay.{0,20}as/i,
+  /write.{0,20}(like|as).{0,20}(a|an).{0,20}(pirate|robot|child|expert)/i,
+  /talk.{0,20}like.{0,20}(a|an).{0,20}(pirate|robot|child)/i,
+  /speak.{0,20}(like|as).{0,20}(a|an)/i,
+  /respond.{0,20}(as|like|in).{0,20}(pirate|shakespear|yoda|emoji)/i,
+  /(pirate|robot|shakespear|yoda).{0,20}(voice|style|language)/i,
+  /write.{0,20}as.{0,20}(shakespeare|shakespear).{0,20}would/i,
   
   // System role injection attempts
   /\bsystem\s*:\s*["'`]/i,
